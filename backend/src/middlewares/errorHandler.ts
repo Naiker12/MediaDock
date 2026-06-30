@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import multer from 'multer'
 import { ExtractorError } from '../extractor/types.js'
 
 export interface AppError extends Error {
@@ -13,6 +14,15 @@ export function errorHandler(
   _next: NextFunction,
 ) {
   console.error('[Error]', err.code || '', err.message)
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ error: 'El archivo excede el límite de 1 GB', code: 'FILE_TOO_LARGE', status: 413 })
+      return
+    }
+    res.status(400).json({ error: err.message, code: err.code, status: 400 })
+    return
+  }
 
   if (err instanceof SyntaxError && 'body' in err) {
     res.status(400).json({

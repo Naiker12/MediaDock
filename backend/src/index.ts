@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import { videoRouter } from './routes/video.js'
+import { clipRouter } from './routes/clip.js'
 import { errorHandler } from './middlewares/errorHandler.js'
 
 const app = express()
@@ -14,14 +15,21 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }))
 app.use(morgan('dev'))
 app.use(express.json({ limit: '1mb' }))
 
-const limiter = rateLimit({
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests. Try again later.', code: 'RATE_LIMIT', status: 429 },
+})
+const postLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   message: { error: 'Too many requests. Try again later.', code: 'RATE_LIMIT', status: 429 },
 })
-app.use('/api/', limiter)
 
+app.use('/api', apiLimiter)
+app.post('/api/*', postLimiter)
 app.use('/api', videoRouter)
+app.use('/api', clipRouter)
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })

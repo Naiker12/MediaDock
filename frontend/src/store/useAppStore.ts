@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { VideoInfo, AppStatus, DownloadItem, DownloadProgress } from '@/types'
+import type { VideoInfo, AppStatus, DownloadItem, DownloadProgress, ClipResult, ClipStatus } from '@/types'
 
 interface AppState {
   status: AppStatus
@@ -14,6 +14,9 @@ interface AppState {
   isDownloading: boolean
   history: DownloadItem[]
   showSettings: boolean
+  clipStatus: ClipStatus
+  clipResult: ClipResult | null
+  clipError: string | null
 
   setStatus: (status: AppStatus) => void
   setVideoInfo: (info: VideoInfo | null) => void
@@ -27,6 +30,9 @@ interface AppState {
   clearHistory: () => void
   reset: () => void
   setShowSettings: (show: boolean) => void
+  setClipStatus: (status: ClipStatus) => void
+  setClipResult: (result: ClipResult | null) => void
+  setClipError: (error: string | null) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -43,6 +49,9 @@ export const useAppStore = create<AppState>()(
       isDownloading: false,
       history: [],
       showSettings: false,
+      clipStatus: 'idle',
+      clipResult: null,
+      clipError: null,
 
       setStatus: (status) => set({ status }),
       setVideoInfo: (info) => set({ videoInfo: info, error: null, errorCode: null }),
@@ -58,6 +67,9 @@ export const useAppStore = create<AppState>()(
         })),
       clearHistory: () => set({ history: [] }),
       setShowSettings: (show) => set({ showSettings: show }),
+      setClipStatus: (clipStatus) => set({ clipStatus }),
+      setClipResult: (clipResult) => set({ clipResult, clipStatus: clipResult ? 'done' : 'idle' }),
+      setClipError: (clipError) => set({ clipError, clipStatus: clipError ? 'error' : 'idle' }),
       reset: () =>
         set({
           status: 'idle',
@@ -68,6 +80,9 @@ export const useAppStore = create<AppState>()(
           selectedQuality: null,
           downloadProgress: null,
           isDownloading: false,
+          clipStatus: 'idle',
+          clipResult: null,
+          clipError: null,
         }),
     }),
     {

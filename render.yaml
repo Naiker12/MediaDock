@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: mediadock-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: PORT
+        value: "3001"
+      - key: CORS_ORIGIN
+        value: https://naiker12.github.io
+      - key: NODE_ENV
+        value: production

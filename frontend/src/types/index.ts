@@ -67,3 +67,24 @@ export interface ApiErrorResponse {
   code: string
   status: number
 }
+
+export interface ClipInfo {
+  index: number
+  start: number
+  end: number
+  label: string
+  filename: string
+  sizeBytes: number
+  durationSec: number
+  thumbnailUrl?: string
+}
+
+export interface ClipResult {
+  videoId: string
+  totalClips: number
+  clipDuration: number
+  clips: ClipInfo[]
+  zipUrl: string
+}
+
+export type ClipStatus = 'idle' | 'processing' | 'done' | 'error'

@@ -85,6 +85,11 @@ export function downloadVideo(
     .then((res) => res.data)
 }
 
+export async function generateClips(url: string, clipDuration = 120, mode: 'fast' | 'precise' = 'fast'): Promise<import('@/types').ClipResult> {
+  const { data } = await api.post<import('@/types').ClipResult>('/clip', { url, clipDuration, mode })
+  return data
+}
+
 function formatSpeed(bytesPerSecond: number): string {
   if (bytesPerSecond === 0) return '--'
   const units = ['B/s', 'KB/s', 'MB/s', 'GB/s']
