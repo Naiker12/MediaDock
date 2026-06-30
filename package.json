@@ -1,7 +1,6 @@
 {
   "name": "video-downloader",
   "private": true,
-  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "frontend:dev": "cd frontend && pnpm dev",
     "frontend:build": "cd frontend && pnpm build",
