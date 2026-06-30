@@ -12,6 +12,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
+RUN pnpm --version
+
 COPY backend/package.json ./
 RUN pnpm install --no-frozen-lockfile
 
