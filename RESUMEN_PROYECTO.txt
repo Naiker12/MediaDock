@@ -1,0 +1,450 @@
+=====================================================================
+  VIDEO DOWNLOADER - RESUMEN COMPLETO DEL PROYECTO v2.0
+=====================================================================
+
+1. DESCRIPCIÓN GENERAL
+---------------------------------------------------------------------
+Aplicaci�n profesional de descarga de videos con datos REALES.
+Frontend: React + Vite (GitHub Pages).
+Backend: Express + TypeScript + yt-dlp + FFmpeg (Railway/Render/VPS).
+
+NO usa datos placeholder/demo. Todo proviene de yt-dlp.
+
+
+2. ESTRUCTURA DEL PROYECTO
+---------------------------------------------------------------------
+
+D:\MediaDock\
+│
+├── package.json                    # Ra�z del monorepo (pnpm workspace)
+├── pnpm-workspace.yaml             # Workspace frontend/ + backend/
+├── .npmrc
+├── .gitignore
+├── AGENTS.md
+├── RESUMEN_PROYECTO.txt
+├── setup-windows.ps1               # Script de instalaci�n automatizada
+│
+├── frontend/                       # React + Vite + Tailwind + shadcn/ui
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── tailwind.config.ts
+│   ├── components.json             # shadcn/ui config oficial
+│   ├── index.html                  # Dark mode + PWA meta tags
+│   ├── .env.example
+│   ├── public/
+│   │   ├── manifest.json           # PWA manifest
+│   │   ├── vite.svg
+│   │   └── icons/                  # PWA icons (192x192, 512x512)
+│   │
+│   └── src/
+│       ├── main.tsx                # Entry + Notification.requestPermission()
+│       ├── App.tsx                 # ErrorBoundary wrapper
+│       ├── index.css               # Tailwind + shimmer
+│       ├── vite-env.d.ts
+│       ├── lib/
+│       │   ├── utils.ts            # cn() utility
+│       │   └── downloadManager.ts  # AbortController global
+│       ├── types/index.ts          # VideoInfo, VideoQuality, AnalyzeResult, etc.
+│       ├── store/useAppStore.ts    # Zustand persist (historial en localStorage)
+│       ├── hooks/useVideoInfo.ts   # TanStack Query mutation
+│       ├── services/api.ts         # Axios + /analyze + /info + /download
+│       ├── utils/format.ts         # formatSize, formatBitrate, formatResolution, etc.
+│       ├── pages/Home.tsx          # Auto-scroll + lazy loading + AnimatePresence
+│       └── components/
+│           ├── ErrorBoundary.tsx
+│           ├── Navbar.tsx
+│           ├── VideoInput.tsx      # Validaci�n URL en tiempo real + auto-paste
+│           ├── Loading.tsx         # Barra progreso + 4 pasos animados
+│           ├── VideoPreview.tsx    # InfoSection compacta + modal HD + ShareButton
+│           ├── DownloadSection.tsx # Progress + History clickeable + Cancel
+│           ├── QualityCard.tsx     # Colores por calidad + AbortController
+│           ├── ErrorState.tsx      # Errores clasificados por tipo
+│           ├── ShareButton.tsx     # Copiar enlace + Twitter + Facebook
+│           ├── KeyboardShortcuts.tsx  # Modal con atajos (presionar ?)
+│           ├── Footer.tsx
+│           └── ui/                 # shadcn/ui (button, input, card, etc.)
+│
+└── backend/                        # Express + TypeScript + yt-dlp + FFmpeg
+    ├── package.json
+    ├── tsconfig.json
+    ├── Dockerfile
+    ├── .env.example
+    │
+    └── src/
+        ├── index.ts                # Express + helmet + cors + morgan + rate-limit
+        │
+        ├── routes/video.ts         # POST /api/analyze, /api/info, /api/download
+        │
+        ├── controllers/videoController.ts  # Zod validation + stream handling
+        │
+        ├── middlewares/errorHandler.ts     # Errores clasificados + yt-dlp 503
+        │
+        ├── extractor/
+        │   └── yt-dlp.ts           # YtDlpExtractor (--dump-single-json)
+        │
+        ├── parser/
+        │   └── metadata.ts         # parseYtDlpOutput() → VideoInfo normalizado
+        │
+        ├── cache/
+        │   └── index.ts            # VideoCache (memoria + disco, TTL 10min)
+        │
+        ├── services/
+        │   ├── videoService.ts     # analyze() → extract + parse + cache
+        │   ├── types.ts            # Tipos expandidos (width, height, bitrate, HDR...)
+        │   ├── yt-dlp/index.ts     # findBinary() con soporte winget + PATH
+        │   └── ffmpeg/index.ts
+        │
+        └── .cache/                 # Cach� de metadatos (autogenerado)
+
+
+3. TECNOLOGÍAS
+---------------------------------------------------------------------
+FRONTEND:
+React 18 · Vite 5 · TypeScript 5 · TailwindCSS 3 · shadcn/ui
+Framer Motion 11 · TanStack Query 5 · Zustand 5 (persist)
+Axios (onDownloadProgress + AbortController)
+Sonner · Lucide React · clsx + tailwind-merge
+
+BACKEND:
+Express 4 · TypeScript 5 · Helmet · CORS · Morgan
+express-rate-limit (10 req/min) · Zod
+yt-dlp 2026.06.09 (instalado local via winget)
+FFmpeg N-124716 (instalado local via winget)
+
+
+4. ERRORES CONOCIDOS Y SOLUCIONES
+---------------------------------------------------------------------
+
+ERROR 1: yt-dlp no instalado (503 Service Unavailable)
+├── Causa: yt-dlp no est� en el PATH del backend
+├── Estado: RESUELTO
+├── Soluci�n:
+│   winget install yt-dlp.yt-dlp    # Instala yt-dlp + FFmpeg
+│   # O configurar YT_DLP_PATH en backend/.env
+└── findBinary() en backend/src/services/yt-dlp/index.ts
+    busca autom�ticamente en rutas de winget
+
+ERROR 2: yt-dlp instalado pero no lo encuentra (PATH desactualizado)
+├── Causa: winget instala pero el PATH nuevo no se hereda
+├── Estado: RESUELTO
+├── Soluci�n:
+│   findBinary() ahora escanea:
+│   1. YT_DLP_PATH en .env
+│   2. %LOCALAPPDATA%\Microsoft\WinGet\Packages\yt-dlp...\
+│   3. $HOME\AppData\Local\Microsoft\WinGet\Packages\...
+│   4. Cada directorio del PATH del sistema
+└── Usa existsSync() para verificar archivos antes de ejecutar
+
+ERROR 3: via.placeholder.com ERR_CONNECTION_CLOSED
+├── Causa: Servicio externo ca�do
+├── Estado: RESUELTO
+├── Soluci�n: Backend devuelve thumbnail real desde YouTube maxresdefault
+└── Sin placeholder - si no hay thumbnail, no se muestra
+
+ERROR 4: Conflicto esbuild 0.21.5 vs 0.28.1
+├── Causa: vite y tsx usan versiones incompatibles
+├── Estado: RESUELTO
+├── Soluci�n: Se elimin� tsx. Backend usa tsc + node dist/index.js
+└── pnpm backend:build → tsc, pnpm backend:start → node dist/index.js
+
+ERROR 5: ERR_MODULE_NOT_FOUND (imports .js)
+├── Causa: NodeNext resolver espera .js
+├── Estado: RESUELTO
+├── Soluci�n: Todos los imports usan .js en src
+└── tsc compila a .js en dist/
+
+ERROR 6: Transiciones UI inconsistentes
+├── Causa: Sin manejo de estados animados
+├── Estado: RESUELTO
+└── AnimatePresence + Framer Motion layout en toda la app
+
+ERROR 7: Sin progreso de descarga
+├── Causa: No hab�a callback onDownloadProgress
+├── Estado: RESUELTO
+└── axios onDownloadProgress + DownloadProgress component
+
+ERROR 8: Cancelar descarga no funcionaba
+├── Causa: No hab�a AbortController conectado
+├── Estado: RESUELTO
+└── AbortController global via downloadManager.ts
+
+ERROR 9: Sin cach� de metadatos
+├── Causa: Cada an�lisis ejecutaba yt-dlp de nuevo
+├── Estado: RESUELTO
+└── VideoCache con memoria + archivos .cache/ TTL 10min
+
+ERROR 10: Sin datos reales (todo placeholder)
+├── Causa: Backend no ten�a yt-dlp
+├── Estado: RESUELTO
+├── Ahora usa YtDlpExtractor + parseYtDlpOutput()
+└── Datos reales: t�tulo, thumbnail HD, uploader, 7+ calidades
+    con codec, fps, bitrate, HDR, subt�tulos, etc.
+
+
+5. ARQUITECTURA BACKEND (v2)
+---------------------------------------------------------------------
+
+POST /api/analyze
+    │
+    ▼
+┌─ Cache ─────────────────────┐
+│ ¿URL ya analizada?          │
+│ ┌─ S� → devolver datos      │
+│ └─ No → continuar           │
+└─────────────────────────────┘
+    │
+    ▼
+┌─ Extractor ─────────────────┐
+│ YtDlpExtractor              │
+│ yt-dlp --dump-single-json   │
+│ └── RawYtDlpOutput          │
+└─────────────────────────────┘
+    │
+    ▼
+┌─ Parser ────────────────────┐
+│ parseYtDlpOutput()          │
+│ ├── getBestThumbnail()      │
+│ ├── mapQualities()          │
+│ ├── getSubtitleLanguages()  │
+│ └── VideoInfo normalizado   │
+└─────────────────────────────┘
+    │
+    ▼
+┌─ Cache ─────────────────────┐
+│ Guardar en memoria + disco  │
+└─────────────────────────────┘
+    │
+    ▼
+┌─ Response ──────────────────┐
+│ { info: VideoInfo,          │
+│   cached: boolean }         │
+└─────────────────────────────┘
+
+
+6. SCHEMA DE DATOS REALES
+---------------------------------------------------------------------
+
+POST /api/analyze
+Response 200:
+{
+  "cached": false,
+  "info": {
+    "id": "dQw4w9WgXcQ",
+    "title": "Rick Astley - Never Gonna Give You Up (Official Video)",
+    "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+    "description": "The official video for Never Gonna Give You Up...",
+    "duration": 213,
+    "durationString": "3:33",
+    "uploader": "Rick Astley",
+    "source": "youtube",
+    "language": "en",
+    "subtitles": ["en", "de-DE", "ja", "pt-BR", "es-419"],
+    "year": null,
+    "season": null,
+    "episode": null,
+    "qualities": [
+      {
+        "id": "4029",
+        "label": "2.16k",
+        "extension": "webm",
+        "codec": "VP9",
+        "fps": 25,
+        "width": 3840,
+        "height": 2160,
+        "bitrate": 20857000,
+        "filesize": 358612992,
+        "audioCodec": "opus",
+        "audioBitrate": 0,
+        "isHDR": false,
+        "isBest": true
+      },
+      { "label": "1.44k", "codec": "VP9", "width": 2560, "height": 1440, ... },
+      { "label": "1.08k", "codec": "avc1.640028", "extension": "mp4", ... },
+      { "label": "720p", "codec": "avc1.4d401f", "extension": "mp4", ... },
+      { "label": "480p", "codec": "avc1.4d401e", "extension": "mp4", ... },
+      { "label": "360p", "codec": "avc1.4d401e", "extension": "mp4", ... },
+      { "label": "Audio", "codec": "mp4a.40.5", "extension": "m4a", ... }
+    ]
+  }
+}
+
+POST /api/info
+  Response: Igual que analyze pero solo el objeto info
+
+POST /api/download
+  Body: { "url": "...", "qualityId": "4029" }
+  Response 200: Binary stream
+  Response 503: { "error": "yt-dlp no instalado...", "code": "EXTRACTOR_UNAVAILABLE" }
+
+GET /health
+  Response: { "status": "ok", "timestamp": "..." }
+
+
+7. EJEMPLO REAL (YouTube)
+---------------------------------------------------------------------
+URL: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+
+Resultado:
+  T�tulo:    Rick Astley - Never Gonna Give You Up (Official Video)
+  Duraci�n:  3:33
+  Uploader:  Rick Astley
+  Source:    youtube
+  Thumbnail: maxresdefault.jpg (HD)
+  Subt�tulos: en, de-DE, ja, pt-BR, es-419
+
+  Calidades (7):
+  2.16k  VP9   webm  3840x2160  25fps  342.0MB
+  1.44k  VP9   webm  2560x1440  25fps  144.1MB
+  1.08k  AVC1  mp4   1920x1080  25fps   77.2MB
+  720p   AVC1  mp4   1280x720   25fps   25.2MB
+  480p   AVC1  mp4    854x480   25fps   13.5MB
+  360p   AVC1  mp4    640x360   25fps    8.0MB
+  Audio  AAC   m4a         0x0   0fps    1.2MB
+
+
+8. ESTADOS DE LA UI
+---------------------------------------------------------------------
+
+IDLE:
+┌─────────────────────────────────────┐
+│        Video Downloader            │
+│   Pega la URL del video y descarga │
+│   [Pega aqu� la URL del video...]  │
+│   ✓ URL v�lida: youtube.com       │
+│         [  Analizar  ]             │
+└─────────────────────────────────────┘
+
+LOADING:
+┌─────────────────────────────────────┐
+│  ████████████████████████░░░ 65%   │
+│  ✓ Analizando enlace...             │
+│  ✓ Obteniendo miniatura...          │
+│  ◌ Leyendo formatos disponibles...  │
+│  ○ Preparando descarga              │
+└─────────────────────────────────────┘
+
+SUCCESS:
+┌──────────────────────────────────────────────┐
+│ ✓ youtube.com / Rick Astley... [Cambiar]    │
+├──────────────────────────────────────────────┤
+│ ┌────────────────────┐ ┌──────────────────┐  │
+│ │  THUMBNAIL REAL    │ │ Rick Astley      │  │
+│ │  maxresdefault.jpg │ │ Never Gonna...   │  │
+│ │                    │ │ youtube | 2026   │  │
+│ │    ▶               │ │                  │  │
+│ │                    │ │ ★★★★★            │  │
+│ │  HD  2160p  3:33   │ │ RECOMENDADO      │  │
+│ └────────────────────┘ │ 2.16k VP9 342MB  │  │
+│  youtube | Rick Astley │                  │  │
+│                        │ Duraci�n  3:33   │  │
+│                        │ Resoluci�n 2160p │  │
+│ Calidades disponibles  │ FPS       25     │  │
+│ ┌────────┐ ┌────────┐  │ C�dec     VP9   │  │
+│ │ ★ BEST │ │ 1.44k  │  │ Audio     opus  │  │
+│ │ 2.16k  │ │ VP9    │  │ Bitrate  20.9M  │  │
+│ │ 342MB  │ │ 144MB  │  │ Subt�t.  5     │  │
+│ │[Descargar]│[Descargar]│ │ ▼ Ver m�s    │  │
+│ └────────┘ └────────┘  └──────────────────┘  │
+│                                              │
+│ Descargas recientes                          │
+│ Hoy                                          │
+│ ┌─────────────────────────┐                  │
+│ │🖼 Rick Astley  2160p ↻ ✔│ hace 2m          │
+│ └─────────────────────────┘                  │
+└──────────────────────────────────────────────┘
+
+
+9. FEATURES IMPLEMENTADAS
+---------------------------------------------------------------------
+✅ An�lisis con datos REALES de yt-dlp (sin placeholders)
+✅ Cache de metadatos (memoria + disco, TTL 10min)
+✅ 7+ calidades detectadas autom�ticamente
+✅ Codec, fps, bitrate, HDR, dimensiones reales
+✅ Subt�tulos e idioma detectados autom�ticamente
+✅ POST /api/analyze (endpoint dedicado)
+✅ Uploader, fecha, descripci�n extra�dos
+✅ Thumbnail en m�xima resoluci�n disponible
+✅ Cancelar descarga real (AbortController)
+✅ Notificaciones desktop al completar
+✅ Historial clickeable (re-analizar)
+✅ Validaci�n URL en tiempo real
+✅ Errores clasificados por tipo (red, server, extractor, URL)
+✅ Auto-scroll a resultados
+✅ Atajos de teclado (presionar ?)
+✅ Compartir en Twitter/Facebook
+✅ PWA manifest + icons
+✅ Code splitting (6 chunks lazy-loaded)
+✅ Colores por calidad (azul 1080p, gris 720p, verde audio)
+✅ Grupo de historial por d�a (Hoy/Ayer/Anteriores)
+✅ findBinary() con detecci�n autom�tica de winget
+
+
+10. CÓMO INICIAR (DESPUÉS DE INSTALAR yt-dlp)
+---------------------------------------------------------------------
+
+# IMPORTANTE: Abrir NUEVA ventana de PowerShell
+# (para que el PATH de yt-dlp est� disponible)
+
+Terminal 1:
+  pnpm frontend:dev          # http://localhost:5173
+
+Terminal 2:
+  pnpm backend:start         # http://localhost:3001
+
+# Si yt-dlp no se encuentra, configurar ruta:
+# backend/.env:
+YT_DLP_PATH=C:\Users\gomez\AppData\Local\Microsoft\WinGet\Packages\yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe\yt-dlp.exe
+
+
+11. TAREAS PENDIENTES
+---------------------------------------------------------------------
+
+PRIORIDAD ALTA:
+┌─────────────────────────────────────────────────────────────┐
+│ [ ] Probar /api/download con calidad real (elegir format_id) │
+│     curl -X POST /api/download                              │
+│     -d '{"url":"https://youtu.be/dQw...","qualityId":"4029"}'│
+│     -o video.webm                                           │
+│                                                              │
+│ [ ] Integrar FFmpeg para convertir formatos                 │
+│     (ej: webm VP9 → mp4 H.264)                             │
+│                                                              │
+│ [ ] Agregar selector de formato de salida (mp4/mkv/webm)   │
+└─────────────────────────────────────────────────────────────┘
+
+PRIORIDAD MEDIA:
+┌─────────────────────────────────────────────────────────────┐
+│ [ ] Tema claro/oscuro                                       │
+│ [ ] Selector de idioma (i18n)                               │
+│ [ ] Servicio worker para PWA offline                        │
+│ [ ] Barra de b�squeda en historial                          │
+│ [ ] M�ltiples descargas simult�neas                         │
+│ [ ] Progreso real de yt-dlp (parsear stderr)               │
+│ [ ] Estimar tiempo de an�lisis                              │
+└─────────────────────────────────────────────────────────────┘
+
+PRIORIDAD BAJA:
+┌─────────────────────────────────────────────────────────────┐
+│ [ ] Tests unitarios (Vitest + Supertest)                   │
+│ [ ] Analizador de bundle (vite-bundle-analyzer)            │
+│ [ ] Compresi�n brotli/gzip en backend                      │
+│ [ ] Logs estructurados (pino)                              │
+│ [ ] Rate limit por API key                                 │
+│ [ ] Modo oscuro autom�tico (prefers-color-scheme)          │
+└─────────────────────────────────────────────────────────────┘
+
+
+12. BUENAS PRÁCTICAS
+---------------------------------------------------------------------
+✅ Monorepo pnpm workspace          ✅ TypeScript estricto
+✅ shadcn/ui oficial config         ✅ Zod validation
+✅ Helmet + CORS + Rate limit       ✅ Manejo global errores
+✅ Axios interceptors               ✅ Framer Motion animate
+✅ Zustand persist (localStorage)   ✅ ErrorBoundary
+✅ ARIA labels                      ✅ Responsive mobile
+✅ PWA manifest + meta tags         ✅ Code splitting
+✅ AbortController descargas        ✅ Cache memoria + disco
+✅ Arquitectura modular (extractor/parser/cache)
+✅ Sin datos placeholder - todo real desde yt-dlp
+=====================================================================

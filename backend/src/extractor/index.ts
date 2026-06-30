@@ -1,0 +1,5 @@
+export type { Extractor, ExtractResult } from './types.js'
+export { ExtractorRegistry, extractorRegistry } from './registry.js'
+export { YtDlpExtractor } from './yt-dlp.js'
+export { CuevanaExtractor } from './cuevana/index.js'
+export { DemoExtractor } from './demo.js'
