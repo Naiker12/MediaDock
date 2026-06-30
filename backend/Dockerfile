@@ -1,11 +1,12 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.20/community" >> /etc/apk/repositories && \
-  apk add --no-cache \
-  yt-dlp \
+RUN apt-get update && apt-get install -y --no-install-recommends \
   ffmpeg \
   python3 \
-  py3-pip
+  python3-pip \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install yt-dlp --break-system-packages --no-cache-dir
 
 WORKDIR /app
 
