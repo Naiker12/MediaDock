@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { extractorRegistry, YtDlpExtractor, DemoExtractor } from '../extractor/index.js'
 import { YtDlp } from './yt-dlp/index.js'
-import { ZipArchive } from 'archiver'
+import archiver from 'archiver'
 import { videoCache } from '../cache/index.js'
 import { FFMpegSegmenter, type ClipInfo } from '../processor/ffmpegSegmenter.js'
 
@@ -121,7 +121,7 @@ export class ClipService {
 
     const zipPath = join(clipDir, 'clips.zip')
     const output = createWriteStream(zipPath)
-    const archive = new ZipArchive({ zlib: { level: 5 } })
+    const archive = archiver('zip', { zlib: { level: 5 } })
 
     return new Promise((resolve, reject) => {
       output.on('close', () => {
