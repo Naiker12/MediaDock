@@ -6,14 +6,17 @@ RUN apk add --no-cache \
   python3 \
   py3-pip
 
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
 
-COPY package.json tsconfig.json ./
-RUN npm install
+COPY backend/package.json backend/tsconfig.json ./
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY backend/src ./src
 
-COPY src ./src
-
-RUN npm run build
+RUN pnpm install --frozen-lockfile --prod
+RUN pnpm build
 
 EXPOSE 3001
 
