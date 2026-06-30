@@ -34,7 +34,7 @@ jobs:
       - name: Build
         working-directory: ./frontend
         env:
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://mediadock-backend.onrender.com/api' }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://mediadock-backend.up.railway.app/api' }}
         run: pnpm build
 
       - uses: actions/configure-pages@v5
