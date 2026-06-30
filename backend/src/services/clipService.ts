@@ -1,10 +1,13 @@
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { extractorRegistry, YtDlpExtractor, DemoExtractor } from '../extractor/index.js'
 import { YtDlp } from './yt-dlp/index.js'
-import archiver from 'archiver'
 import { videoCache } from '../cache/index.js'
+
+const require = createRequire(import.meta.url)
+const archiver = require('archiver')
 import { FFMpegSegmenter, type ClipInfo } from '../processor/ffmpegSegmenter.js'
 
 let initialized = false
