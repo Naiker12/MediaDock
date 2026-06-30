@@ -8,19 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip3 install yt-dlp --break-system-packages --no-cache-dir
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
 WORKDIR /app
 
-RUN pnpm --version
-
 COPY backend/package.json ./
-RUN pnpm install --no-frozen-lockfile
+RUN npm install
 
 COPY backend/tsconfig.json ./
 COPY backend/src ./src
 
-RUN pnpm build
+RUN npm run build
 
 EXPOSE 3001
 
@@ -28,4 +24,4 @@ ENV YT_DLP_PATH=yt-dlp
 ENV FFMPEG_PATH=ffmpeg
 ENV NODE_ENV=production
 
-CMD ["pnpm", "start"]
+CMD ["node", "dist/index.js"]
