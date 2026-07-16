@@ -37,6 +37,13 @@ app.get('/health', (_req, res) => {
 
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`)
+})
+
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled Rejection:', reason)
 })

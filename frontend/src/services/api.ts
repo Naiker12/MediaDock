@@ -86,7 +86,7 @@ export function downloadVideo(
 }
 
 export async function generateClips(url: string, clipDuration = 120, mode: 'fast' | 'precise' = 'fast'): Promise<import('@/types').ClipResult> {
-  const { data } = await api.post<import('@/types').ClipResult>('/clip', { url, clipDuration, mode })
+  const { data } = await api.post<import('@/types').ClipResult>('/clip', { url, clipDuration, mode }, { timeout: 600000 })
   return data
 }
 

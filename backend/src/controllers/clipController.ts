@@ -12,7 +12,7 @@ if (!existsSync(uploadsDir)) {
 
 const upload = multer({
   dest: uploadsDir,
-  limits: { fileSize: 1024 * 1024 * 1024 },
+  limits: { fileSize: 1024 * 1024 * 1024 * 5 },
   fileFilter: (_req, file, cb) => {
     const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'))
     const allowed = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v']

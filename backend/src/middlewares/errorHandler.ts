@@ -17,7 +17,7 @@ export function errorHandler(
 
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      res.status(413).json({ error: 'El archivo excede el límite de 1 GB', code: 'FILE_TOO_LARGE', status: 413 })
+      res.status(413).json({ error: 'El archivo excede el límite de 5 GB', code: 'FILE_TOO_LARGE', status: 413 })
       return
     }
     res.status(400).json({ error: err.message, code: err.code, status: 400 })

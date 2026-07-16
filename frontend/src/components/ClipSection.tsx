@@ -64,7 +64,7 @@ export function ClipSection() {
       formData.append('mode', mode)
 
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 600000)
+      const timeout = setTimeout(() => controller.abort(), 1800000)
       const res = await fetch(`${API_URL}/clip/upload`, {
         method: 'POST',
         body: formData,
@@ -180,7 +180,7 @@ export function ClipSection() {
                       Haz clic o arrastra un video aquí
                     </p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      MP4, MKV, WEBM, AVI, MOV (máx 1 GB)
+                      MP4, MKV, WEBM, AVI, MOV (máx 5 GB)
                     </p>
                   </div>
                 </>
@@ -322,7 +322,7 @@ export function ClipSection() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {clipResult.clips.map((clip) => (
+            {[...clipResult.clips].sort((a, b) => a.index - b.index).map((clip) => (
               <ClipCard
                 key={clip.index}
                 clip={clip}

@@ -22,11 +22,21 @@ export class FFMpegSegmenter {
     mode: 'fast' | 'precise',
   ): Promise<{ clips: ClipInfo[]; clipDir: string }> {
     const clipDir = join(process.cwd(), 'downloads', videoId, 'clips')
-    const { mkdir } = await import('node:fs/promises')
+    const { mkdir, rm } = await import('node:fs/promises')
+    await rm(clipDir, { recursive: true, force: true })
     await mkdir(clipDir, { recursive: true })
 
+    const sourceDuration = FFmpeg.probeDuration(inputPath)
     await FFmpeg.runSegment(inputPath, clipDir, clipDuration, mode)
     let clips = await FFMpegSegmenter.labelClips(clipDir, clipDuration)
+
+    if (clips.length > 0) {
+      const lastClip = clips[clips.length - 1]
+      const processedDuration = lastClip.end
+      if (processedDuration < sourceDuration - 1) {
+        console.warn(`[FFmpegSegmenter] Solo se procesaron ${Math.round(processedDuration / 60)} min de ${Math.round(sourceDuration / 60)} min totales. Usa modo "Preciso" para videos largos.`)
+      }
+    }
     clips = await FFMpegSegmenter.generateClipThumbnails(clips, clipDir, videoId)
 
     return { clips, clipDir }
@@ -34,19 +44,25 @@ export class FFMpegSegmenter {
 
   private static async labelClips(clipDir: string, clipDuration: number): Promise<ClipInfo[]> {
     const files = await readdir(clipDir)
-    const mp4Files = files.filter(f => f.endsWith('.mp4')).sort()
+    const mp4Files = files.filter(f => f.endsWith('.mp4')).sort((a, b) => {
+      const numA = parseInt(a.match(/clip_(\d+)/)?.[1] || '0', 10)
+      const numB = parseInt(b.match(/clip_(\d+)/)?.[1] || '0', 10)
+      return numA - numB
+    })
 
     const clips: ClipInfo[] = []
+    let currentTime = 0
 
     for (let i = 0; i < mp4Files.length; i++) {
       const oldName = mp4Files[i]
-      const start = i * clipDuration
+      const start = currentTime
       const oldPath = join(clipDir, oldName)
       const stats = await stat(oldPath)
 
       const probeDuration = FFmpeg.probeDuration(oldPath)
-      const actualDuration = Math.min(probeDuration, clipDuration)
-      const end = start + actualDuration
+      const actualDuration = probeDuration
+      currentTime += actualDuration
+      const end = currentTime
 
       const labelStart = secondsToTimestamp(start)
       const labelEnd = secondsToTimestamp(end)

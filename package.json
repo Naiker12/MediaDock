@@ -2,10 +2,14 @@
   "name": "video-downloader",
   "private": true,
   "scripts": {
+    "dev": "concurrently \"pnpm backend:dev\" \"pnpm frontend:dev\"",
     "frontend:dev": "cd frontend && pnpm dev",
     "frontend:build": "cd frontend && pnpm build",
     "backend:dev": "cd backend && pnpm dev",
     "backend:build": "cd backend && pnpm build",
     "backend:start": "cd backend && pnpm start"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

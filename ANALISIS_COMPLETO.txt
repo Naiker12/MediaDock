@@ -1,0 +1,557 @@
+=====================================================================
+  MEDIADOCK - ANÁLISIS COMPLETO DEL SISTEMA
+=====================================================================
+
+  1. DESCRIPCIÓN GENERAL
+  ---------------------------------------------------------------------
+  MediaDock es un descargador de videos profesional con datos REALES
+  desde yt-dlp. NO usa placeholders/demo.
+
+  Frontend: React 18 + Vite 5 + TypeScript 5 + TailwindCSS 3 + shadcn/ui
+  Backend: Express 4 + TypeScript 5 + yt-dlp + FFmpeg
+
+
+  2. ESTRUCTURA DEL PROYECTO (Monorepo pnpm)
+  ---------------------------------------------------------------------
+  D:\MediaDock\
+  │
+  ├── package.json              # Scripts: frontend:dev, backend:start, etc.
+  ├── pnpm-workspace.yaml       # workspaces: frontend/ + backend/
+  ├── .gitignore
+  ├── AGENTS.md                 # Instrucciones para la IA
+  ├── RESUMEN_PROYECTO.txt      # Documentación del proyecto
+  ├── ANALISIS_COMPLETO.txt     # ESTE ARCHIVO
+  ├── setup-windows.ps1         # Script de instalación automatizada
+  │
+  ├── frontend/                 # React + Vite (GitHub Pages)
+  │   ├── package.json
+  │   ├── vite.config.ts
+  │   ├── tsconfig.json
+  │   ├── tailwind.config.ts
+  │   ├── components.json       # shadcn/ui config
+  │   ├── index.html            # Dark mode + PWA meta tags
+  │   ├── postcss.config.js
+  │   ├── .env.example
+  │   ├── public/
+  │   │   ├── manifest.json     # PWA manifest
+  │   │   ├── vite.svg
+  │   │   └── icons/            # PWA icons
+  │   │
+  │   └── src/
+  │       ├── main.tsx          # Entry + Notification.requestPermission()
+  │       ├── App.tsx           # ErrorBoundary wrapper
+  │       ├── index.css         # Tailwind + shimmer animations
+  │       ├── vite-env.d.ts     # Vite env types
+  │       │
+  │       ├── types/
+  │       │   └── index.ts      # VideoInfo, VideoQuality, AnalyzeResult,
+  │       │                       DownloadItem, DownloadProgress, AppStatus
+  │       │
+  │       ├── store/
+  │       │   └── useAppStore.ts # Zustand + persist (historial localStorage)
+  │       │
+  │       ├── hooks/
+  │       │   └── useVideoInfo.ts # TanStack Query mutation
+  │       │
+  │       ├── services/
+  │       │   └── api.ts        # Axios + /analyze + /download + interceptors
+  │       │
+  │       ├── lib/
+  │       │   ├── utils.ts      # cn() utility (clsx + tailwind-merge)
+  │       │   └── downloadManager.ts # AbortController global
+  │       │
+  │       ├── utils/
+  │       │   └── format.ts     # formatSize, formatBitrate, formatResolution
+  │       │
+  │       ├── pages/
+  │       │   └── Home.tsx      # Orquestador: VideoInput + Loading/Preview/Error
+  │       │
+  │       └── components/
+  │           ├── ErrorBoundary.tsx
+  │           ├── Navbar.tsx
+  │           ├── VideoInput.tsx    # Validación URL + auto-paste
+  │           ├── Loading.tsx       # Barra progreso + 4 pasos animados
+  │           ├── VideoPreview.tsx  # Info + thumbnail HD + modal
+  │           ├── DownloadSection.tsx # Progreso + historial + cancelar
+  │           ├── QualityCard.tsx   # Colores por calidad + descarga
+  │           ├── ErrorState.tsx    # Errores clasificados
+  │           ├── ShareButton.tsx   # Twitter + Facebook + copiar
+  │           ├── KeyboardShortcuts.tsx # Modal (presionar ?)
+  │           ├── SettingsPanel.tsx # Panel de configuración
+  │           ├── Footer.tsx
+  │           └── ui/              # shadcn/ui components
+  │
+  └── backend/                 # Express + TypeScript (Railway/Render/VPS)
+      ├── package.json
+      ├── tsconfig.json
+      ├── Dockerfile
+      ├── .env.example
+      ├── .cache/              # Caché de metadatos (autogenerado)
+      ├── dist/                # Compilado TypeScript
+      │
+      └── src/
+          ├── index.ts         # Express + Helmet + CORS + Morgan + Rate Limit
+          │
+          ├── routes/
+          │   └── video.ts     # POST /api/analyze, /api/download
+          │
+          ├── controllers/
+          │   └── videoController.ts # Zod validation + stream handling
+          │
+          ├── middlewares/
+          │   └── errorHandler.ts    # Errores clasificados + ExtractorError
+          │
+          ├── extractor/
+          │   ├── index.ts     # Re-exporta todo
+          │   ├── types.ts     # Interface Extractor + ExtractorError
+          │   ├── registry.ts  # ExtractorRegistry (Strategy Pattern)
+          │   ├── yt-dlp.ts    # YtDlpExtractor (--dump-single-json)
+          │   ├── demo.ts      # Fallback sin yt-dlp
+          │   └── cuevana/     # Extractor especial para Cuevana
+          │
+          ├── parser/
+          │   └── metadata.ts  # parseYtDlpOutput() → VideoInfo normalizado
+          │
+          ├── cache/
+          │   └── index.ts     # VideoCache (memoria + disco, TTL 10min)
+          │
+          └── services/
+              ├── videoService.ts # analyze() → extract + parse + cache
+              ├── types.ts        # VideoInfo, VideoQuality, AnalyzeResult
+              ├── yt-dlp/
+              │   └── index.ts    # findBinary() con soporte winget
+              └── ffmpeg/
+                  └── index.ts    # findBinary() FFmpeg
+
+
+  3. ARQUITECTURA BACKEND (en capas)
+  ---------------------------------------------------------------------
+  Capa 1: Routes → Enrutamiento (video.ts)
+  Capa 2: Controllers → Validación Zod (videoController.ts)
+  Capa 3: Services → Lógica de negocio (videoService.ts)
+  Capa 4: Extractor → Strategy Pattern (registry.ts + extractores)
+  Capa 5: Parser → Transformación de datos (metadata.ts)
+  Capa 6: Cache → Memoria + disco (cache/index.ts)
+  Capa 7: ErrorHandler → Middleware global (errorHandler.ts)
+
+
+  4. FLUJO DE ANÁLISIS (POST /api/analyze)
+  ---------------------------------------------------------------------
+  Cliente → { url }
+      │
+      ▼
+  [videoController] Valida con Zod urlSchema
+      │
+      ▼
+  [VideoService.analyze(url)]
+      │
+      ├─ ¿URL en caché?
+      │   ├─ Sí → devuelve { info, cached: true } (sin ejecutar yt-dlp)
+      │   └─ No → continúa
+      │
+      ▼
+  [ExtractorRegistry.getExtractor(url)]
+      │  Busca extractor que cumpla canHandle(url)
+      │
+      ▼
+  [YtDlpExtractor.extract(url)]
+      │  Ejecuta: yt-dlp --dump-single-json --no-warnings --no-playlist {url}
+      │
+      ▼
+  [parseYtDlpOutput(raw)]
+      │  getBestThumbnail() → thumbnail más grande
+      │  mapQualities() → agrupa por altura (2160p...Audio)
+      │  getSubtitleLanguages() → extrae idiomas
+      │  parseDuration() → "3:33"
+      │
+      ▼
+  [VideoCache.set(url, info)]
+      │  Guarda en Map (memoria) + .cache/{hash}.json (disco)
+      │  TTL: 10 minutos
+      │
+      ▼
+  Response → { info: VideoInfo, cached: false }
+
+
+  5. FLUJO DE DESCARGA (POST /api/download)
+  ---------------------------------------------------------------------
+  Cliente → { url, qualityId }
+      │
+      ▼
+  [videoController] Valida con Zod downloadSchema
+      │
+      ▼
+  [VideoService.download(url, qualityId)]
+      │
+      ▼
+  [ExtractorRegistry.download(url, qualityId)]
+      │
+      ▼
+  [YtDlpExtractor.download(url, qualityId)]
+      │  qualityId = "4029" (format_id numérico)
+      │  o qualityId = "1080p" (se mapea a formato yt-dlp)
+      │
+      ▼
+  [YtDlp.execStream(['-f', format, '-o', '-', url])]
+      │  Stremear binario directamente
+      │
+      ▼
+  [stream.pipe(res)]
+      │  Content-Type: video/mp4
+      │  Content-Disposition: attachment
+      │
+      ▼
+  [Cliente recibe con axios onDownloadProgress]
+      │  Barra de progreso + velocidad + ETA
+      │  AbortController para cancelar
+
+
+  6. SISTEMA DE EXTRACTORES (Strategy Pattern)
+  ---------------------------------------------------------------------
+  Interface Extractor:
+    canHandle(url: string): boolean
+    extract(url: string): Promise<ExtractResult>
+    download(url: string, qualityId: string): Promise<NodeJS.ReadableStream>
+
+  Extractores registrados (orden de prioridad):
+    1. CuevanaExtractor → canHandle: detecta URLs de Cuevana
+    2. YtDlpExtractor → canHandle: cualquier URL válida (universal)
+    3. DemoExtractor → Solo si yt-dlp no está instalado
+
+  ExtractorRegistry:
+    register(extractor) → agrega a lista
+    getExtractor(url) → busca el primero que cumpla canHandle
+    extract(url) → delega al extractor correspondiente
+    download(url, qualityId) → delega al extractor correspondiente
+
+
+  7. SISTEMA DE CACHÉ
+  ---------------------------------------------------------------------
+  VideoCache:
+    - Memoria: Map<string, { key, data, timestamp }>
+    - Disco: .cache/{sha256[:16]}.json
+    - TTL: 10 minutos (600,000 ms)
+    - Limpieza automática cada 30 minutos
+    - Hash: SHA-256 de la URL (primeros 16 chars hex)
+
+  Flujo get(url):
+    1. Buscar en memoria → si existe y no expiró → devolver
+    2. Buscar en disco → si existe y no expiró → cargar a memoria + devolver
+    3. Si expiró en disco → refrescar timestamp, devolver null
+    4. Si no existe → devolver null
+
+  Flujo set(url, data):
+    1. Guardar en memoria
+    2. Guardar en disco (silent fail si falla escritura)
+
+
+  8. MANEJO DE ERRORES
+  ---------------------------------------------------------------------
+  errorHandler.ts (middleware global):
+    - SyntaxError (JSON inválido) → 400 INVALID_JSON
+    - ExtractorError → status + code del extractor
+    - Otros → 500 INTERNAL_ERROR
+
+  videoController.ts:
+    - ZodError en analyze → 400 INVALID_URL
+    - ZodError en download → 400 INVALID_REQUEST
+    - ValidationError (calidad inválida) → 400 INVALID_QUALITY
+
+  Errores conocidos (todos RESUELTOS):
+    - yt-dlp no instalado → 503 EXTRACTOR_UNAVAILABLE
+    - yt-dlp no encontrado → findBinary() escanea winget + PATH
+    - via.placeholder.com caído → thumbnail real desde YouTube
+    - Conflicto esbuild → se eliminó tsx, usa tsc + node
+    - ERR_MODULE_NOT_FOUND → imports con .js
+    - Sin progreso descarga → onDownloadProgress
+    - Cancelar descarga → AbortController global
+    - Sin caché → VideoCache memoria + disco
+    - Sin datos reales → YtDlpExtractor + parser
+
+
+  9. TECNOLOGÍAS
+  ---------------------------------------------------------------------
+  FRONTEND                    | BACKEND
+  ----------------------------|----------------------------
+  React 18                    | Express 4
+  Vite 5                      | TypeScript 5
+  TypeScript 5                | Helmet (seguridad)
+  TailwindCSS 3               | CORS
+  shadcn/ui (Radix UI)        | Morgan (logs)
+  Framer Motion 11            | express-rate-limit (10 req/min)
+  TanStack Query 5            | Zod (validación)
+  Zustand 5 (persist)         | Cheerio (scraping)
+  Axios (onDownloadProgress)  |
+  Sonner (toasts)             | SISTEMA
+  Lucide React (iconos)       | ----------------------------
+  clsx + tailwind-merge       | yt-dlp 2026.06
+  Zod                         | FFmpeg N-124716
+                              | Node.js 20+
+                              | pnpm
+                              | Docker
+
+
+  10. COMPONENTES FRONTEND DETALLADOS
+  ---------------------------------------------------------------------
+  Navbar.tsx:
+    - Logo + título
+    - Botón de ajustes (⚙)
+    - Botón de historial
+
+  VideoInput.tsx:
+    - Input de URL con validación en tiempo real
+    - Detección automática de plataforma (YouTube, TikTok, etc.)
+    - Auto-paste (Ctrl+V o点击)
+    - Botón "Analizar" (deshabilitado si URL inválida)
+    - Regex por plataforma para validación
+
+  Loading.tsx:
+    - Barra de progreso animada (shimmer)
+    - 4 pasos con checkmarks animados
+    - Framer Motion AnimatePresence
+
+  VideoPreview.tsx:
+    - Thumbnail HD (maxresdefault)
+    - Título, uploader, duración, source
+    - Subtítulos disponibles
+    - Modal para thumbnail en HD completa
+    - ShareButton (Twitter, Facebook, copiar enlace)
+    - Calidades disponibles en QualityCard
+
+  QualityCard.tsx:
+    - Colores por calidad:
+      2160p → Púrpura
+      1440p → Índigo
+      1080p → Azul
+      720p  → Gris
+      480p  → Café
+      360p  → Café claro
+      Audio → Verde
+    - Codec, extensión, tamaño, FPS
+    - Botón "Descargar" con AbortController
+    - Etiqueta "★ BEST" en la mejor calidad
+
+  DownloadSection.tsx:
+    - Barra de progreso con velocidad y ETA
+    - Botón "Cancelar" (AbortController)
+    - Historial agrupado por día (Hoy / Ayer / Anteriores)
+    - Items clickeables para re-analizar
+    - Notificación desktop al completar
+
+  ErrorState.tsx:
+    - Errores clasificados por tipo:
+      NETWORK_ERROR → "No hay conexión"
+      TIMEOUT → "Tardó demasiado"
+      EXTRACTOR_UNAVAILABLE → "yt-dlp no instalado"
+      INVALID_URL → "URL inválida"
+      Otros → "Error del servidor"
+
+  KeyboardShortcuts.tsx:
+    - Modal que se abre con tecla "?"
+    - Lista de atajos: Enter, Escape, etc.
+
+
+  11. ESTADOS DE LA APLICACIÓN
+  ---------------------------------------------------------------------
+  useAppStore (Zustand):
+    status: 'idle' | 'loading' | 'success' | 'error'
+
+    idle:     Input vacío, título, footer
+    loading:  Loading con 4 pasos animados
+    success:  VideoPreview + DownloadSection + historial
+    error:    ErrorState con mensaje clasificado
+
+  Transiciones:
+    idle → loading: usuario hace clic en "Analizar"
+    loading → success: respuesta exitosa del backend
+    loading → error: error del backend o red
+    success → loading: usuario cambia URL y analiza de nuevo
+    error → loading: usuario intenta de nuevo
+
+
+  12. DOWNLOAD MANAGER (AbortController global)
+  ---------------------------------------------------------------------
+  downloadManager.ts:
+    currentAbort: AbortController | null
+
+    setAbortController(controller): Guarda el controller actual
+    cancelDownload(): Aborta la descarga actual
+    getAbortSignal(): Obtiene la señal para Axios
+
+    Uso:
+      Al iniciar descarga: new AbortController() → setAbortController()
+      Al cancelar: cancelDownload()
+      Al terminar: setAbortController(null)
+
+
+  13. FORMATOS Y UTILIDADES
+  ---------------------------------------------------------------------
+  format.ts:
+    formatSize(bytes):  "342.0 MB", "1.2 MB", "25.2 MB"
+    formatBitrate(bps): "20.9 Mbps", "1.5 Mbps"
+    formatResolution(w, h): "3840x2160"
+    formatFps(fps): "25fps"
+
+  utils.ts:
+    cn(...inputs): clsx + tailwind-merge para classnames condicionales
+
+
+  14. TAREAS PENDIENTES
+  ---------------------------------------------------------------------
+  PRIORIDAD ALTA:
+    [ ] Probar /api/download con calidad real
+    [ ] Integrar FFmpeg para conversión (webm VP9 → mp4 H.264)
+    [ ] Selector de formato de salida (mp4/mkv/webm)
+
+  PRIORIDAD MEDIA:
+    [ ] Tema claro/oscuro
+    [ ] Selector de idioma (i18n)
+    [ ] Service worker para PWA offline
+    [ ] Búsqueda en historial
+    [ ] Múltiples descargas simultáneas
+    [ ] Progreso real de yt-dlp (parsear stderr)
+    [ ] Estimar tiempo de análisis
+
+  PRIORIDAD BAJA:
+    [ ] Tests unitarios (Vitest + Supertest)
+    [ ] Analizador de bundle (vite-bundle-analyzer)
+    [ ] Compresión brotli/gzip en backend
+    [ ] Logs estructurados (pino)
+    [ ] Rate limit por API key
+    [ ] Modo oscuro automático (prefers-color-scheme)
+
+
+  15. CÓMO FUNCIONA CADA ARCHIVO CLAVE
+  ---------------------------------------------------------------------
+  
+  backend/src/index.ts:
+    Crea Express app, aplica middleware global (helmet, cors, morgan, rate-limit),
+    monta rutas /api, /health, y errorHandler. Puerto 3001.
+
+  backend/src/routes/video.ts:
+    Define POST /api/analyze y POST /api/download, conecta con controladores.
+
+  backend/src/controllers/videoController.ts:
+    Valida body con Zod schemas. analyzeVideo() llama VideoService.analyze().
+    downloadVideo() obtiene stream y lo pipea a res con headers.
+
+  backend/src/services/videoService.ts:
+    ensureInit() registra extractores. analyze() revisa caché primero, 
+    si no hay llama extractorRegistry.extract(). download() delega a 
+    extractorRegistry.download().
+
+  backend/src/extractor/registry.ts:
+    Strategy Pattern. Register/extract/download delega al extractor 
+    que cumple canHandle(url).
+
+  backend/src/extractor/yt-dlp.ts:
+    canHandle: cualquier URL válida. extract: ejecuta yt-dlp y parsea JSON.
+    download: ejecuta yt-dlp con -f format_id y stremea stdout.
+
+  backend/src/parser/metadata.ts:
+    parseYtDlpOutput: normaliza el JSON de yt-dlp a VideoInfo.
+    mapQualities: filtra, ordena y agrupa formatos de video+audio.
+
+  backend/src/cache/index.ts:
+    VideoCache con Map en memoria + archivos JSON en .cache/.
+    Hash SHA-256 de URL como key. TTL 10 min.
+
+  backend/src/middlewares/errorHandler.ts:
+    Captura SyntaxError, ExtractorError, y errores genéricos.
+    Responde con { error, code, status }.
+
+  frontend/src/App.tsx:
+    ErrorBoundary + Home component.
+
+  frontend/src/pages/Home.tsx:
+    VideoInput + AnimatePresence con Loading/VideoPreview/DownloadSection/
+    ErrorState según status. Lazy loading con Suspense.
+
+  frontend/src/store/useAppStore.ts:
+    Zustand con persist. Estado completo de la app: status, videoInfo,
+    error, downloadProgress, history, etc.
+
+  frontend/src/hooks/useVideoInfo.ts:
+    TanStack Query useMutation. onMutate → loading, onSuccess → success,
+    onError → error + toast.
+
+  frontend/src/services/api.ts:
+    Axios instance con interceptors. analyzeVideo() y downloadVideo()
+    con onDownloadProgress y AbortSignal.
+
+  frontend/src/lib/downloadManager.ts:
+    AbortController singleton. set/cancel/get para descargas.
+
+
+  16. API COMPLETA
+  ---------------------------------------------------------------------
+
+  POST /api/analyze
+    Request:  { "url": "https://www.youtube.com/watch?v=..." }
+    Response: {
+      "cached": false,
+      "info": {
+        "id": "dQw4w9WgXcQ",
+        "title": "Rick Astley - Never Gonna Give You Up...",
+        "thumbnail": "https://i.ytimg.com/vi/.../maxresdefault.jpg",
+        "description": "...",
+        "duration": 213,
+        "durationString": "3:33",
+        "uploader": "Rick Astley",
+        "source": "youtube",
+        "language": "en",
+        "subtitles": ["en", "de-DE", "ja"],
+        "qualities": [
+          { "id": "4029", "label": "2.16k", "extension": "webm",
+            "codec": "VP9", "fps": 25, "width": 3840, "height": 2160,
+            "bitrate": 20857000, "filesize": 358612992,
+            "audioCodec": "opus", "isHDR": false, "isBest": true },
+          ...
+        ]
+      }
+    }
+    Errores: 400 INVALID_URL, 503 EXTRACTOR_UNAVAILABLE
+
+  POST /api/download
+    Request:  { "url": "...", "qualityId": "4029" }
+    Response: Binary stream (video/mp4)
+    Headers:  Content-Type: video/mp4
+              Content-Disposition: attachment; filename="video.mp4"
+    Errores:  400 INVALID_REQUEST, 400 INVALID_QUALITY
+
+  GET /health
+    Response: { "status": "ok", "timestamp": "2026-06-30T..." }
+
+
+  17. COMANDOS DE DESARROLLO
+  ---------------------------------------------------------------------
+  pnpm frontend:dev    → Inicia Vite dev server (localhost:5173)
+  pnpm frontend:build  → Build producción frontend
+  pnpm backend:dev     → Compila + inicia backend (tsc + node)
+  pnpm backend:build   → Compila TypeScript a dist/
+  pnpm backend:start   → Inicia backend compilado (localhost:3001)
+
+  Importante: yt-dlp debe estar instalado (winget install yt-dlp.yt-dlp)
+  y abrir NUEVA terminal para que el PATH se actualice.
+
+
+  18. VARIABLES DE ENTORNO
+  ---------------------------------------------------------------------
+  frontend/.env:
+    VITE_API_URL=http://localhost:3001/api
+
+  backend/.env:
+    PORT=3001
+    CORS_ORIGIN=http://localhost:5173
+    YT_DLP_PATH=C:\...\yt-dlp.exe  (opcional, findBinary() lo busca auto)
+
+
+  19. DATOS DEL PROYECTO
+  ---------------------------------------------------------------------
+  Autor: Naiker12 (https://github.com/Naiker12)
+  Licencia: MIT
+  Repositorio: https://github.com/Naiker12/MediaDock
+
+=====================================================================
+  FIN DEL ANÁLISIS
+=====================================================================

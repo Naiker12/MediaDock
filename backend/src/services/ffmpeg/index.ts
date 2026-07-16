@@ -52,74 +52,58 @@ export class FFmpeg {
     mode: 'fast' | 'precise' = 'fast',
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const outputPattern = `${outputDir}/clip_%03d.mp4`
+      const duration = this.probeDuration(inputPath)
+      const totalClips = Math.ceil(duration / segmentTime)
+      let clipIndex = 0
 
-      if (mode === 'fast') {
-        const proc = spawn(this.binary, [
-          '-y',
-          '-i', inputPath,
-          '-c', 'copy',
-          '-map', '0',
-          '-f', 'segment',
-          '-segment_time', String(segmentTime),
-          '-reset_timestamps', '1',
-          '-segment_format', 'mp4',
-          outputPattern,
-        ])
+      const runClip = () => {
+        if (clipIndex >= totalClips) {
+          resolve()
+          return
+        }
+
+        const start = clipIndex * segmentTime
+        const filename = `${outputDir}/clip_${String(clipIndex + 1).padStart(3, '0')}.mp4`
+
+        const args = mode === 'fast'
+          ? [
+              '-y',
+              '-ss', formatTime(start),
+              '-i', inputPath,
+              '-t', formatTime(segmentTime),
+              '-c', 'copy',
+              '-avoid_negative_ts', 'make_zero',
+              filename,
+            ]
+          : [
+              '-y',
+              '-ss', formatTime(start),
+              '-i', inputPath,
+              '-t', formatTime(segmentTime),
+              '-c:v', 'libx264',
+              '-c:a', 'aac',
+              filename,
+            ]
+
+        const proc = spawn(this.binary, args)
         let stderr = ''
         proc.stderr.on('data', (data: Buffer) => {
           stderr += data.toString()
         })
+
         proc.on('close', (code) => {
-          if (code === 0) resolve()
-          else reject(new Error(`FFmpeg segment failed (exit ${code}): ${stderr.slice(-500)}`))
-        })
-        proc.on('error', reject)
-      } else {
-        const clipDir = outputDir
-        const duration = this.probeDuration(inputPath)
-        const totalClips = Math.ceil(duration / segmentTime)
-
-        let clipIndex = 0
-        const runPrecise = () => {
-          if (clipIndex >= totalClips) {
-            resolve()
-            return
+          if (code === 0) {
+            clipIndex++
+            setImmediate(runClip)
+          } else {
+            reject(new Error(`FFmpeg ${mode} clip ${clipIndex + 1} failed (exit ${code}): ${stderr.slice(-500)}`))
           }
+        })
 
-          const start = clipIndex * segmentTime
-          const end = Math.min((clipIndex + 1) * segmentTime, duration)
-          const filename = `${clipDir}/clip_${String(clipIndex).padStart(3, '0')}.mp4`
-
-          const proc = spawn(this.binary, [
-            '-y',
-            '-i', inputPath,
-            '-ss', formatTime(start),
-            '-to', formatTime(end),
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            filename,
-          ])
-
-          let stderr = ''
-          proc.stderr.on('data', (data: Buffer) => {
-            stderr += data.toString()
-          })
-
-          proc.on('close', (code) => {
-            if (code === 0) {
-              clipIndex++
-              setImmediate(runPrecise)
-            } else {
-              reject(new Error(`FFmpeg precise clip failed (exit ${code}): ${stderr.slice(-500)}`))
-            }
-          })
-
-          proc.on('error', reject)
-        }
-
-        setImmediate(runPrecise)
+        proc.on('error', reject)
       }
+
+      setImmediate(runClip)
     })
   }
 }
@@ -128,5 +112,10 @@ function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const sInt = Math.floor(s)
+  const sFrac = s - sInt
+  const sStr = sFrac > 0.001
+    ? `${String(sInt).padStart(2, '0')}.${Math.round(sFrac * 1000)}`
+    : `${String(sInt).padStart(2, '0')}`
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${sStr}`
 }
