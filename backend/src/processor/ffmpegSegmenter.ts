@@ -27,14 +27,19 @@ export class FFMpegSegmenter {
     await mkdir(clipDir, { recursive: true })
 
     const sourceDuration = FFmpeg.probeDuration(inputPath)
-    await FFmpeg.runSegment(inputPath, clipDir, clipDuration, mode)
+    const segResult = await FFmpeg.runSegment(inputPath, clipDir, clipDuration, mode)
+
+    if (segResult.failedClips.length > 0) {
+      console.warn(`[FFmpegSegmenter] ${segResult.failedClips.length} clips fallaron: ${segResult.failedClips.join(', ')}`)
+    }
+
     let clips = await FFMpegSegmenter.labelClips(clipDir, clipDuration)
 
     if (clips.length > 0) {
       const lastClip = clips[clips.length - 1]
       const processedDuration = lastClip.end
       if (processedDuration < sourceDuration - 1) {
-        console.warn(`[FFmpegSegmenter] Solo se procesaron ${Math.round(processedDuration / 60)} min de ${Math.round(sourceDuration / 60)} min totales. Usa modo "Preciso" para videos largos.`)
+        console.warn(`[FFmpegSegmenter] Solo se procesaron ${Math.round(processedDuration / 60)} min de ${Math.round(sourceDuration / 60)} min totales.`)
       }
     }
     clips = await FFMpegSegmenter.generateClipThumbnails(clips, clipDir, videoId)
@@ -52,21 +57,41 @@ export class FFMpegSegmenter {
 
     const clips: ClipInfo[] = []
     let currentTime = 0
+    let reindex = 0
 
     for (let i = 0; i < mp4Files.length; i++) {
       const oldName = mp4Files[i]
-      const start = currentTime
       const oldPath = join(clipDir, oldName)
-      const stats = await stat(oldPath)
 
-      const probeDuration = FFmpeg.probeDuration(oldPath)
-      const actualDuration = probeDuration
+      let stats
+      try {
+        stats = await stat(oldPath)
+      } catch {
+        console.warn(`[FFmpegSegmenter] No se pudo leer ${oldName}, saltando.`)
+        continue
+      }
+
+      if (stats.size === 0) {
+        console.warn(`[FFmpegSegmenter] ${oldName} está vacío (0 bytes), eliminando.`)
+        await unlink(oldPath).catch(() => {})
+        continue
+      }
+
+      const actualDuration = FFmpeg.probeDurationSafe(oldPath)
+      if (actualDuration === null || actualDuration < 0.1) {
+        console.warn(`[FFmpegSegmenter] ${oldName} tiene duración inválida (${actualDuration}), eliminando.`)
+        await unlink(oldPath).catch(() => {})
+        continue
+      }
+
+      const start = currentTime
       currentTime += actualDuration
       const end = currentTime
+      reindex++
 
       const labelStart = secondsToTimestamp(start)
       const labelEnd = secondsToTimestamp(end)
-      const newName = `clip_${String(i + 1).padStart(3, '0')}_${secondsToLabel(start)}-${secondsToLabel(end)}.mp4`
+      const newName = `clip_${String(reindex).padStart(3, '0')}_${secondsToLabel(start)}-${secondsToLabel(end)}.mp4`
       const newPath = join(clipDir, newName)
 
       if (oldName !== newName) {
@@ -74,7 +99,7 @@ export class FFMpegSegmenter {
       }
 
       clips.push({
-        index: i + 1,
+        index: reindex,
         start: Math.floor(start),
         end: Math.floor(end),
         label: `${labelStart} - ${labelEnd}`,

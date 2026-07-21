@@ -1,4 +1,11 @@
+import { join } from 'node:path'
 import { spawn, execSync } from 'node:child_process'
+
+export interface SegmentResult {
+  totalExpected: number
+  generated: number
+  failedClips: number[]
+}
 
 export class FFmpeg {
   static binary = process.env.FFMPEG_PATH || 'ffmpeg'
@@ -45,66 +52,91 @@ export class FFmpeg {
     return seconds
   }
 
-  static runSegment(
+  static probeDurationSafe(inputPath: string): number | null {
+    try {
+      return this.probeDuration(inputPath)
+    } catch {
+      return null
+    }
+  }
+
+  private static buildArgs(
+    inputPath: string,
+    outputPath: string,
+    start: number,
+    duration: number,
+    mode: 'fast' | 'precise',
+  ): string[] {
+    const base = [
+      '-y',
+      '-ss', formatTime(start),
+      '-i', inputPath,
+      '-t', formatTime(duration),
+    ]
+    if (mode === 'fast') {
+      return [...base, '-c', 'copy', '-avoid_negative_ts', 'make_zero', outputPath]
+    }
+    return [...base, '-c:v', 'libx264', '-c:a', 'aac', outputPath]
+  }
+
+  private static runSingleClip(
+    inputPath: string,
+    outputPath: string,
+    start: number,
+    duration: number,
+    mode: 'fast' | 'precise',
+  ): Promise<boolean> {
+    return new Promise((resolve) => {
+      const args = this.buildArgs(inputPath, outputPath, start, duration, mode)
+      const proc = spawn(this.binary, args)
+      let stderr = ''
+      proc.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString()
+      })
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve(true)
+        } else {
+          console.warn(`[FFmpeg] clip at ${formatTime(start)} failed (${mode}, exit ${code}): ${stderr.slice(-300)}`)
+          resolve(false)
+        }
+      })
+      proc.on('error', (err) => {
+        console.warn(`[FFmpeg] clip at ${formatTime(start)} spawn error: ${err.message}`)
+        resolve(false)
+      })
+    })
+  }
+
+  static async runSegment(
     inputPath: string,
     outputDir: string,
     segmentTime: number,
     mode: 'fast' | 'precise' = 'fast',
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const duration = this.probeDuration(inputPath)
-      const totalClips = Math.ceil(duration / segmentTime)
-      let clipIndex = 0
+  ): Promise<SegmentResult> {
+    const duration = this.probeDuration(inputPath)
+    const totalClips = Math.ceil(duration / segmentTime)
+    const failedClips: number[] = []
 
-      const runClip = () => {
-        if (clipIndex >= totalClips) {
-          resolve()
-          return
-        }
+    for (let i = 0; i < totalClips; i++) {
+      const clipNum = i + 1
+      const start = i * segmentTime
+      const outputPath = join(outputDir, `clip_${String(clipNum).padStart(3, '0')}.mp4`)
 
-        const start = clipIndex * segmentTime
-        const filename = `${outputDir}/clip_${String(clipIndex + 1).padStart(3, '0')}.mp4`
+      let ok = await this.runSingleClip(inputPath, outputPath, start, segmentTime, mode)
 
-        const args = mode === 'fast'
-          ? [
-              '-y',
-              '-ss', formatTime(start),
-              '-i', inputPath,
-              '-t', formatTime(segmentTime),
-              '-c', 'copy',
-              '-avoid_negative_ts', 'make_zero',
-              filename,
-            ]
-          : [
-              '-y',
-              '-ss', formatTime(start),
-              '-i', inputPath,
-              '-t', formatTime(segmentTime),
-              '-c:v', 'libx264',
-              '-c:a', 'aac',
-              filename,
-            ]
-
-        const proc = spawn(this.binary, args)
-        let stderr = ''
-        proc.stderr.on('data', (data: Buffer) => {
-          stderr += data.toString()
-        })
-
-        proc.on('close', (code) => {
-          if (code === 0) {
-            clipIndex++
-            setImmediate(runClip)
-          } else {
-            reject(new Error(`FFmpeg ${mode} clip ${clipIndex + 1} failed (exit ${code}): ${stderr.slice(-500)}`))
-          }
-        })
-
-        proc.on('error', reject)
+      if (!ok && mode === 'fast') {
+        console.log(`[FFmpeg] Retrying clip ${clipNum} at ${formatTime(start)} in precise mode...`)
+        ok = await this.runSingleClip(inputPath, outputPath, start, segmentTime, 'precise')
       }
 
-      setImmediate(runClip)
-    })
+      if (!ok) {
+        failedClips.push(clipNum)
+        console.warn(`[FFmpeg] Clip ${clipNum} (${formatTime(start)}) failed in both modes, skipping.`)
+      }
+    }
+
+    return { totalExpected: totalClips, generated: totalClips - failedClips.length, failedClips }
   }
 }
 
