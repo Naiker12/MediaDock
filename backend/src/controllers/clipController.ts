@@ -43,13 +43,13 @@ export async function uploadAndClip(req: Request, res: Response, next: NextFunct
     const clipDuration = Math.min(Math.max(parseInt(req.body.clipDuration) || 120, 10), 900)
     const mode: 'fast' | 'precise' = req.body.mode === 'precise' ? 'precise' : 'fast'
 
-    const result = await ClipService.clipLocalFile(
+    const job = ClipService.startLocalJob(
       req.file.path,
       req.file.originalname,
       clipDuration,
       mode,
     )
-    res.json(result)
+    res.status(202).json(job)
   } catch (error) {
     next(error)
   }
@@ -58,8 +58,8 @@ export async function uploadAndClip(req: Request, res: Response, next: NextFunct
 export async function generateClips(req: Request, res: Response, next: NextFunction) {
   try {
     const { url, qualityId, clipDuration, mode } = clipSchema.parse(req.body)
-    const result = await ClipService.generateClips(url, qualityId, clipDuration, mode)
-    res.json(result)
+    const job = ClipService.startUrlJob(url, qualityId, clipDuration, mode)
+    res.status(202).json(job)
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({
@@ -116,6 +116,11 @@ export async function downloadAllClips(req: Request, res: Response, next: NextFu
 export async function getClipStatus(req: Request, res: Response, next: NextFunction) {
   try {
     const videoId = req.params['videoId'] as string
+    const job = ClipService.getJob(videoId)
+    if (job) {
+      res.json(job)
+      return
+    }
     const status = await ClipService.getClipStatus(videoId)
     res.json(status)
   } catch (error) {

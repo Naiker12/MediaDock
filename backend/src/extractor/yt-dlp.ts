@@ -55,6 +55,7 @@ const QUALITY_MAP: Record<string, string> = {
   '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
   '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
   'Audio': 'bestaudio/best',
+  'audio-only': 'bestaudio/best',
 }
 
 export class YtDlpExtractor implements Extractor {

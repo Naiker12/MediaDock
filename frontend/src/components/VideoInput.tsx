@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent, type ClipboardEvent } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Link, Globe, X, AlertCircle, Loader2 } from 'lucide-react'
+import { Search, Link, Globe, X, AlertCircle } from 'lucide-react'
+import { Loading } from '@/components/Loading'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useVideoInfo } from '@/hooks/useVideoInfo'
@@ -101,12 +102,7 @@ export function VideoInput() {
           className="h-14 min-w-[120px] gap-2 rounded-xl font-medium"
           aria-label="Analizar video"
         >
-          {isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Analizando
-            </>
-          ) : (
+          {isPending ? <Loading compact label="Analizando" /> : (
             <>
               <Search className="h-4 w-4" />
               Analizar
@@ -125,7 +121,7 @@ export function VideoInput() {
               detected.bg, detected.color, detected.border,
             )}
           >
-            <span>{detected.emoji}</span>
+            <span className="platform-mark">{detected.mark}</span>
             <span>{detected.name} detectado</span>
           </motion.div>
         )}
@@ -160,7 +156,7 @@ export function VideoInput() {
           >
             {PLATFORMS.slice(0, 6).map((p) => (
               <span key={p.id} className="flex items-center gap-1">
-                <span>{p.emoji}</span>
+                <span className="platform-mark">{p.mark}</span>
                 <span className="hidden sm:inline">{p.name}</span>
               </span>
             ))}

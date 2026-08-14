@@ -7,7 +7,8 @@ import { formatSize } from '@/utils/format'
 import type { VideoQuality } from '@/types'
 import { cn } from '@/lib/utils'
 import { setAbortController } from '@/lib/downloadManager'
-import { Download, Monitor, Music, Loader2, Star } from 'lucide-react'
+import { Download, Monitor, Music, Star } from 'lucide-react'
+import { Loading } from '@/components/Loading'
 import { toast } from 'sonner'
 
 interface QualityCardProps {
@@ -141,9 +142,7 @@ export function QualityCard({ quality, index }: QualityCardProps) {
             disabled={isDownloading}
             onClick={handleDownload}
           >
-            {isDownloading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+            {isDownloading ? <Loading compact label="" /> : (
               <Download className="h-4 w-4" />
             )}
             {isDownloading ? 'Descargando...' : 'Descargar'}

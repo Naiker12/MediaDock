@@ -7,6 +7,14 @@ export interface SegmentResult {
   failedClips: number[]
 }
 
+export interface SegmentProgress {
+  index: number
+  total: number
+  start: number
+  duration: number
+  outputPath: string
+}
+
 export class FFmpeg {
   static binary = process.env.FFMPEG_PATH || 'ffmpeg'
   static ffprobeBinary = process.env.FFPROBE_PATH || 'ffprobe'
@@ -113,6 +121,7 @@ export class FFmpeg {
     outputDir: string,
     segmentTime: number,
     mode: 'fast' | 'precise' = 'fast',
+    onClipGenerated?: (progress: SegmentProgress) => void | Promise<void>,
   ): Promise<SegmentResult> {
     const duration = this.probeDuration(inputPath)
     const totalClips = Math.ceil(duration / segmentTime)
@@ -133,6 +142,8 @@ export class FFmpeg {
       if (!ok) {
         failedClips.push(clipNum)
         console.warn(`[FFmpeg] Clip ${clipNum} (${formatTime(start)}) failed in both modes, skipping.`)
+      } else {
+        await onClipGenerated?.({ index: clipNum, total: totalClips, start, duration: Math.min(segmentTime, duration - start), outputPath })
       }
     }
 

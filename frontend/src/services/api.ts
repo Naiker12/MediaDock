@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AnalyzeResult, DownloadProgress, ApiErrorResponse } from '@/types'
+import type { AnalyzeResult, DownloadProgress, ApiErrorResponse, ClipJob } from '@/types'
 
 export class ApiRequestError extends Error {
   constructor(
@@ -23,6 +23,11 @@ api.interceptors.response.use(
   (error) => {
     if (axios.isCancel(error)) {
       return Promise.reject(new Error('Descarga cancelada'))
+    }
+    // Las descargas usan responseType: 'blob'. Conservamos el Blob para que
+    // downloadVideo pueda leer el mensaje JSON real del servidor.
+    if (error.response?.data instanceof Blob) {
+      return Promise.reject(error)
     }
     if (error.response?.data) {
       const apiError = error.response.data as ApiErrorResponse
@@ -83,10 +88,29 @@ export function downloadVideo(
       },
     )
     .then((res) => res.data)
+    .catch(async (error: unknown) => {
+      if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+        const blob = error.response.data
+        if (blob.type.includes('json')) {
+          const payload = await new Response(blob).json() as Partial<ApiErrorResponse>
+          throw new ApiRequestError(
+            payload.error || 'No se pudo completar la descarga.',
+            payload.code || 'DOWNLOAD_ERROR',
+            error.response.status,
+          )
+        }
+      }
+      throw error
+    })
 }
 
-export async function generateClips(url: string, clipDuration = 120, mode: 'fast' | 'precise' = 'fast'): Promise<import('@/types').ClipResult> {
-  const { data } = await api.post<import('@/types').ClipResult>('/clip', { url, clipDuration, mode }, { timeout: 600000 })
+export async function generateClips(url: string, clipDuration = 120, mode: 'fast' | 'precise' = 'fast'): Promise<ClipJob> {
+  const { data } = await api.post<ClipJob>('/clip', { url, clipDuration, mode })
+  return data
+}
+
+export async function getClipJob(jobId: string): Promise<ClipJob> {
+  const { data } = await api.get<ClipJob>(`/clip/${jobId}/status`)
   return data
 }
 

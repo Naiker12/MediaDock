@@ -18,6 +18,9 @@ app.use(express.json({ limit: '1mb' }))
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  // El progreso de clips consulta este endpoint con frecuencia mientras FFmpeg trabaja.
+  // Tiene su propio límite en la ruta para no bloquear el resto de la API.
+  skip: (req) => req.method === 'GET' && /^\/clip\/[^/]+\/status$/.test(req.path),
   message: { error: 'Too many requests. Try again later.', code: 'RATE_LIMIT', status: 429 },
 })
 const postLimiter = rateLimit({

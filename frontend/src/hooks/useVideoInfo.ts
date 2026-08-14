@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { toast } from 'sonner'
 
 export function useVideoInfo() {
-  const { setStatus, setVideoInfo, setError } = useAppStore()
+  const { setStatus, setVideoInfo, setVideoReady, setError } = useAppStore()
 
   return useMutation({
     mutationFn: (url: string) => analyzeVideo(url).then(r => r.info),
@@ -15,8 +15,7 @@ export function useVideoInfo() {
       setError(null)
     },
     onSuccess: (data) => {
-      setVideoInfo(data)
-      setStatus('success')
+      setVideoReady(data)
     },
     onError: (err: Error) => {
       const code = err instanceof ApiRequestError ? err.code : null

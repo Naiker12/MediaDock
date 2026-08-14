@@ -1,7 +1,7 @@
-import { readdir, rename, stat, unlink, rmdir } from 'node:fs/promises'
+import { readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { FFmpeg } from '../services/ffmpeg/index.js'
-import { secondsToLabel, secondsToTimestamp } from '../utils/timeFormat.js'
+import { secondsToTimestamp } from '../utils/timeFormat.js'
 
 export interface ClipInfo {
   index: number
@@ -20,6 +20,7 @@ export class FFMpegSegmenter {
     videoId: string,
     clipDuration: number,
     mode: 'fast' | 'precise',
+    onClipGenerated?: (clip: ClipInfo, total: number) => void | Promise<void>,
   ): Promise<{ clips: ClipInfo[]; clipDir: string }> {
     const clipDir = join(process.cwd(), 'downloads', videoId, 'clips')
     const { mkdir, rm } = await import('node:fs/promises')
@@ -27,7 +28,18 @@ export class FFMpegSegmenter {
     await mkdir(clipDir, { recursive: true })
 
     const sourceDuration = FFmpeg.probeDuration(inputPath)
-    const segResult = await FFmpeg.runSegment(inputPath, clipDir, clipDuration, mode)
+    const segResult = await FFmpeg.runSegment(inputPath, clipDir, clipDuration, mode, async (progress) => {
+      const stats = await stat(progress.outputPath)
+      await onClipGenerated?.({
+        index: progress.index,
+        start: Math.floor(progress.start),
+        end: Math.floor(progress.start + progress.duration),
+        label: `${secondsToTimestamp(progress.start)} - ${secondsToTimestamp(progress.start + progress.duration)}`,
+        filename: progress.outputPath.split(/[\\/]/).pop()!,
+        sizeBytes: stats.size,
+        durationSec: Math.floor(progress.duration),
+      }, progress.total)
+    })
 
     if (segResult.failedClips.length > 0) {
       console.warn(`[FFmpegSegmenter] ${segResult.failedClips.length} clips fallaron: ${segResult.failedClips.join(', ')}`)
@@ -91,19 +103,12 @@ export class FFMpegSegmenter {
 
       const labelStart = secondsToTimestamp(start)
       const labelEnd = secondsToTimestamp(end)
-      const newName = `clip_${String(reindex).padStart(3, '0')}_${secondsToLabel(start)}-${secondsToLabel(end)}.mp4`
-      const newPath = join(clipDir, newName)
-
-      if (oldName !== newName) {
-        await rename(oldPath, newPath)
-      }
-
       clips.push({
         index: reindex,
         start: Math.floor(start),
         end: Math.floor(end),
         label: `${labelStart} - ${labelEnd}`,
-        filename: newName,
+        filename: oldName,
         sizeBytes: stats.size,
         durationSec: Math.floor(actualDuration),
       })
@@ -119,7 +124,6 @@ export class FFMpegSegmenter {
   ): Promise<ClipInfo[]> {
     const results: ClipInfo[] = []
     const queue = [...clips]
-    const running = new Set<Promise<void>>()
     const concurrency = 4
 
     const processOne = async (clip: ClipInfo) => {
@@ -144,24 +148,17 @@ export class FFMpegSegmenter {
       }
     }
 
-    const startNext = () => {
-      while (running.size < concurrency && queue.length > 0) {
-        const clip = queue.shift()!
-        const p = processOne(clip).finally(() => {
-          running.delete(p)
-          startNext()
-        })
-        running.add(p)
+    // Cada trabajador toma un clip hasta vaciar la cola. Promise.all espera
+    // a todos, no solo a los cuatro primeros que iniciaron el proceso.
+    const workers = Array.from({ length: Math.min(concurrency, clips.length) }, async () => {
+      while (queue.length > 0) {
+        const clip = queue.shift()
+        if (clip) await processOne(clip)
       }
-    }
+    })
+    await Promise.all(workers)
 
-    startNext()
-
-    if (running.size > 0) {
-      await Promise.all([...running])
-    }
-
-    return results
+    return results.sort((a, b) => a.index - b.index)
   }
 
   static async generateThumbnail(clipPath: string, thumbPath: string, seekTime = 1): Promise<void> {

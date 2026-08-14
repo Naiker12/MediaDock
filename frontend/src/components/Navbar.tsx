@@ -19,10 +19,10 @@ export function Navbar() {
           </div>
           <div>
             <span className="text-base font-semibold text-zinc-100">
-              Video<span className="text-primary">Downloader</span>
+              Media<span className="text-primary">Dock</span>
             </span>
             <p className="text-[10px] leading-tight text-zinc-500 hidden sm:block">
-              Download videos from multiple platforms
+              Descargas y clips, en un solo lugar
             </p>
           </div>
         </div>

@@ -20,6 +20,7 @@ interface AppState {
 
   setStatus: (status: AppStatus) => void
   setVideoInfo: (info: VideoInfo | null) => void
+  setVideoReady: (info: VideoInfo) => void
   setVideoUrl: (url: string | null) => void
   setError: (error: string | null, code?: string | null) => void
   setSelectedQuality: (quality: string | null) => void
@@ -55,6 +56,7 @@ export const useAppStore = create<AppState>()(
 
       setStatus: (status) => set({ status }),
       setVideoInfo: (info) => set({ videoInfo: info, error: null, errorCode: null }),
+      setVideoReady: (info) => set({ status: 'success', videoInfo: info, error: null, errorCode: null }),
       setVideoUrl: (url) => set({ videoUrl: url }),
       setError: (error, code = null) => set({ error, errorCode: code, videoInfo: null }),
       setSelectedQuality: (quality) => set({ selectedQuality: quality }),

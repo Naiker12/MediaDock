@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Scissors, Download, Loader2, FileVideo, Package, Upload, Film, X } from 'lucide-react'
+import { Scissors, Download, FileVideo, Package, Upload, Film, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loading } from '@/components/Loading'
 import { useAppStore } from '@/store/useAppStore'
-import { generateClips } from '@/services/api'
+import { generateClips, getClipJob } from '@/services/api'
 import { ApiRequestError } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { formatSize } from '@/utils/format'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { ClipInfo, ClipResult } from '@/types'
+import type { ClipInfo, ClipJob } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
+const CLIPS_PER_PAGE = 12
 
 export function ClipSection() {
   const { videoInfo, videoUrl, clipStatus, clipResult, clipError, setClipResult, setClipError, setClipStatus } = useAppStore()
@@ -18,6 +20,8 @@ export function ClipSection() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [liveJob, setLiveJob] = useState<ClipJob | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const inputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -31,7 +35,27 @@ export function ClipSection() {
     }
   }, [uploadFile])
 
-  const isProcessing = clipStatus === 'processing' || uploading
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [clipResult?.videoId])
+
+  const isProcessing = clipStatus === 'processing' || uploading || liveJob?.status === 'processing'
+
+  const waitForJob = async (jobId: string) => {
+    while (true) {
+      const job = await getClipJob(jobId)
+      setLiveJob(job)
+      if (job.status === 'done' && job.result) {
+        setClipResult(job.result)
+        return
+      }
+      if (job.status === 'error') {
+        setClipError(job.error || 'No se pudieron generar los clips')
+        return
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 900))
+    }
+  }
 
   const handleGenerate = async () => {
     if (uploadFile) {
@@ -46,8 +70,9 @@ export function ClipSection() {
     setClipStatus('processing')
     setClipError(null)
     try {
-      const result = await generateClips(videoUrl, clipDuration, mode)
-      setClipResult(result)
+      const job = await generateClips(videoUrl, clipDuration, mode)
+      setLiveJob(job)
+      await waitForJob(job.jobId)
     } catch (err) {
       setClipError(err instanceof ApiRequestError ? err.message : 'Error al generar clips')
     }
@@ -77,16 +102,17 @@ export function ClipSection() {
         throw new Error(err.error || 'Error al procesar el video')
       }
 
-      const result: ClipResult = await res.json()
-      setClipResult(result)
+      const job: ClipJob = await res.json()
+      setLiveJob(job)
+      await waitForJob(job.jobId)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setClipError('La subida tardó demasiado. Intenta con un video más pequeño.')
       } else {
         setClipError(err instanceof Error ? err.message : 'Error al subir el video')
       }
-    } finally {
-      setUploading(false)
+      } finally {
+        setUploading(false)
     }
   }
 
@@ -126,6 +152,16 @@ export function ClipSection() {
   ]
 
   const showUpload = !videoUrl || uploadFile
+  const sortedResultClips = clipResult ? [...clipResult.clips].sort((a, b) => a.index - b.index) : []
+  const totalPages = Math.max(1, Math.ceil(sortedResultClips.length / CLIPS_PER_PAGE))
+  const visibleResultClips = sortedResultClips.slice((currentPage - 1) * CLIPS_PER_PAGE, currentPage * CLIPS_PER_PAGE)
+  const stageCopy: Record<ClipJob['stage'], string> = {
+    preparing: 'Preparando el video…',
+    downloading: 'Descargando el video fuente…',
+    segmenting: 'Generando clips en tiempo real…',
+    finalizing: 'Creando las vistas previas…',
+    done: 'Clips listos',
+  }
 
   return (
     <motion.div
@@ -155,7 +191,7 @@ export function ClipSection() {
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+                        <Loading compact label="" />
                       </div>
                     )}
                     <button
@@ -262,9 +298,7 @@ export function ClipSection() {
                 onClick={handleGenerate}
                 className="ml-auto gap-1.5"
               >
-                {isProcessing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
+                {isProcessing ? <Loading compact label="" /> : (
                   <Scissors className="h-3.5 w-3.5" />
                 )}
                 {uploading ? 'Subiendo...' : isProcessing ? 'Generando...' : 'Generar clips'}
@@ -272,11 +306,20 @@ export function ClipSection() {
             </div>
 
             {isProcessing && (
-              <div className="flex items-center gap-3 rounded-lg bg-zinc-800/30 px-4 py-3">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <div className="text-sm text-zinc-300">
-                  {uploadFile ? 'Procesando video...' : `Cortando video en segmentos de ${clipDuration / 60} min...`}
-                </div>
+              <div className="space-y-3">
+                <Loading
+                  label={liveJob ? stageCopy[liveJob.stage] : uploadFile ? 'Subiendo el video' : 'Iniciando la generación'}
+                  detail={liveJob?.stage === 'segmenting'
+                    ? `${liveJob.clipsGenerated}${liveJob.totalClips ? ` de ${liveJob.totalClips}` : ''} clips listos hasta ahora`
+                    : uploadFile ? 'Tu archivo se está enviando al servidor' : `Los clips serán de ${clipDuration / 60} min`}
+                />
+                {liveJob && liveJob.clips.length > 0 && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {[...liveJob.clips].sort((a, b) => a.index - b.index).map((clip) => (
+                      <ClipCard key={clip.index} clip={clip} onDownload={() => undefined} pending />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -295,7 +338,7 @@ export function ClipSection() {
           animate={{ opacity: 1 }}
           className="space-y-3"
         >
-          <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 px-4 py-3">
             <span className="text-xs text-zinc-400">
               {clipResult.totalClips} clips de {formatDuration(clipDuration)} generados
             </span>
@@ -322,7 +365,7 @@ export function ClipSection() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[...clipResult.clips].sort((a, b) => a.index - b.index).map((clip) => (
+            {visibleResultClips.map((clip) => (
               <ClipCard
                 key={clip.index}
                 clip={clip}
@@ -330,6 +373,23 @@ export function ClipSection() {
               />
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between rounded-xl border border-zinc-800/70 bg-zinc-900/30 px-3 py-2.5">
+              <p className="text-xs text-zinc-500">
+                Mostrando {(currentPage - 1) * CLIPS_PER_PAGE + 1}–{Math.min(currentPage * CLIPS_PER_PAGE, sortedResultClips.length)} de {sortedResultClips.length} clips
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)} aria-label="Página anterior">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-16 text-center text-xs font-medium text-zinc-300">{currentPage} / {totalPages}</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => page + 1)} aria-label="Página siguiente">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </motion.div>
@@ -339,9 +399,10 @@ export function ClipSection() {
 interface ClipCardProps {
   clip: ClipInfo
   onDownload: () => void
+  pending?: boolean
 }
 
-function ClipCard({ clip, onDownload }: ClipCardProps) {
+function ClipCard({ clip, onDownload, pending = false }: ClipCardProps) {
   const [thumbLoaded, setThumbLoaded] = useState(false)
   const [thumbError, setThumbError] = useState(false)
 
@@ -377,9 +438,10 @@ function ClipCard({ clip, onDownload }: ClipCardProps) {
         <Button
           variant="ghost"
           size="icon"
+          disabled={pending}
           className="h-8 w-8 text-zinc-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity"
           onClick={onDownload}
-          aria-label={`Descargar clip ${clip.index}`}
+          aria-label={pending ? `Clip ${clip.index} en preparación` : `Descargar clip ${clip.index}`}
         >
           <Download className="h-3.5 w-3.5" />
         </Button>

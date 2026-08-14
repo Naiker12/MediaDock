@@ -1,7 +1,7 @@
 export interface PlatformInfo {
   id: string
   name: string
-  emoji: string
+  mark: string
   color: string
   bg: string
   border: string
@@ -9,14 +9,14 @@ export interface PlatformInfo {
 }
 
 export const PLATFORMS: PlatformInfo[] = [
-  { id: 'youtube', name: 'YouTube', emoji: '▶️', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30', domains: ['youtube.com', 'youtu.be'] },
-  { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/30', domains: ['tiktok.com'] },
-  { id: 'instagram', name: 'Instagram', emoji: '📷', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30', domains: ['instagram.com'] },
-  { id: 'facebook', name: 'Facebook', emoji: '👍', color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/30', domains: ['facebook.com', 'fb.watch'] },
-  { id: 'vimeo', name: 'Vimeo', emoji: '🔵', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/30', domains: ['vimeo.com'] },
-  { id: 'twitter', name: 'X', emoji: '🐦', color: 'text-zinc-300', bg: 'bg-zinc-300/10', border: 'border-zinc-300/30', domains: ['twitter.com', 'x.com'] },
-  { id: 'twitch', name: 'Twitch', emoji: '🎮', color: 'text-purple-600', bg: 'bg-purple-600/10', border: 'border-purple-600/30', domains: ['twitch.tv'] },
-  { id: 'kick', name: 'Kick', emoji: '⏩', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/30', domains: ['kick.com'] },
+  { id: 'youtube', name: 'YouTube', mark: 'YT', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', domains: ['youtube.com', 'youtu.be'] },
+  { id: 'tiktok', name: 'TikTok', mark: 'TT', color: 'text-pink-300', bg: 'bg-pink-500/10', border: 'border-pink-500/30', domains: ['tiktok.com'] },
+  { id: 'instagram', name: 'Instagram', mark: 'IG', color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/30', domains: ['instagram.com'] },
+  { id: 'facebook', name: 'Facebook', mark: 'f', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30', domains: ['facebook.com', 'fb.watch'] },
+  { id: 'vimeo', name: 'Vimeo', mark: 'V', color: 'text-sky-300', bg: 'bg-sky-500/10', border: 'border-sky-500/30', domains: ['vimeo.com'] },
+  { id: 'twitter', name: 'X', mark: 'X', color: 'text-zinc-200', bg: 'bg-zinc-300/10', border: 'border-zinc-300/30', domains: ['twitter.com', 'x.com'] },
+  { id: 'twitch', name: 'Twitch', mark: 'T', color: 'text-violet-300', bg: 'bg-violet-500/10', border: 'border-violet-500/30', domains: ['twitch.tv'] },
+  { id: 'kick', name: 'Kick', mark: 'K', color: 'text-lime-300', bg: 'bg-lime-500/10', border: 'border-lime-500/30', domains: ['kick.com'] },
 ]
 
 export function formatDuration(seconds: number): string {
@@ -80,7 +80,5 @@ export function detectPlatform(url: string): PlatformInfo | null {
 
 export function guessPlatformFromText(text: string): PlatformInfo | null {
   const lower = text.toLowerCase()
-  return PLATFORMS.find(p =>
-    p.domains.some(d => lower.includes(d))
-  ) || null
+  return PLATFORMS.find(p => p.domains.some(d => lower.includes(d))) || null
 }

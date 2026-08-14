@@ -87,4 +87,15 @@ export interface ClipResult {
   zipUrl: string
 }
 
+export interface ClipJob {
+  jobId: string
+  status: 'processing' | 'done' | 'error'
+  stage: 'preparing' | 'downloading' | 'segmenting' | 'finalizing' | 'done'
+  clipsGenerated: number
+  totalClips?: number
+  clips: ClipInfo[]
+  result?: ClipResult
+  error?: string
+}
+
 export type ClipStatus = 'idle' | 'processing' | 'done' | 'error'

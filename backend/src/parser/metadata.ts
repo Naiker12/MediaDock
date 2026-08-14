@@ -63,7 +63,7 @@ function mapQualities(raw: RawYtDlpOutput): VideoQuality[] {
   const audioFormat = raw.formats.find(f => f.vcodec === 'none' && f.acodec !== 'none')
   if (audioFormat) {
     qualities.push({
-      id: 'audio-only',
+      id: audioFormat.format_id,
       label: 'Audio',
       extension: audioFormat.ext || 'm4a',
       codec: audioFormat.acodec || 'AAC',
