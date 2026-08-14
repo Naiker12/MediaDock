@@ -1,184 +1,129 @@
+# MediaDock
 
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://i.imgur.com/5cY0Q5H.png">
-    <img src="https://i.imgur.com/5cY0Q5H.png" alt="MediaDock Banner" width="100%">
-  </picture>
+Aplicación web para analizar enlaces de video, descargar formatos disponibles y generar clips de forma simple.
 
-  <div align="center">
+## Vistas
 
-  # MediaDock 🎬
+### Descargar un video
 
-  **Descargador de videos profesional con datos reales desde yt-dlp**
+Analiza un enlace, consulta la información disponible y elige la calidad o pista de audio que quieres descargar.
 
-  ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)
-  ![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)
-  ![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite)
-  ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?logo=tailwindcss)
-  ![Express](https://img.shields.io/badge/Express-4.21-000000?logo=express)
-  ![yt-dlp](https://img.shields.io/badge/yt--dlp-2026.06-FF0000?logo=youtube)
-  ![License](https://img.shields.io/badge/License-MIT-green)
+![Vista de descarga](frontend/public/descagar.png)
 
-  [✨ Características](#-características) •
-  [🏗️ Arquitectura](#️-arquitectura) •
-  [⚙️ Tecnologías](#️-tecnologías) •
-  [🚀 Instalación](#-instalación) •
-  [📡 API](#-api)
+### Generar clips
 
-  </div>
+Puedes crear clips desde una URL o subir un archivo. El progreso muestra las etapas del trabajo y añade cada clip a la pantalla cuando está listo.
 
-  ---
+![Vista de clips](frontend/public/clic.png)
 
-  ## 📋 Descripción General
+## Características
 
-  **MediaDock** es una aplicación profesional de descarga de videos que extrae **metadatos reales** y permite descargar videos desde **múltiples plataformas** (YouTube, TikTok, Instagram, Facebook, Vimeo, Twitter/X, Twitch, Kick y sitios de streaming como Cuevana).
+- Análisis de URLs mediante `yt-dlp` y extractores dedicados.
+- Metadatos del video: título, miniatura, duración, canal, códec, FPS y bitrate.
+- Descarga de video o audio en los formatos disponibles.
+- Progreso de descarga y posibilidad de cancelarla.
+- Generación de clips desde URL o archivo local.
+- Estado de clips en tiempo real: preparación, descarga, segmentación y finalización.
+- Historial local de descargas, atajos de teclado y mensajes de error claros.
+- Interfaz oscura, responsive y accesible, con animaciones reducidas cuando el sistema lo solicita.
 
-  > ⚡ **Sin datos placeholder.** Toda la información proviene de `yt-dlp` y extractores reales.
+## Arquitectura
 
-  ### 🎯 Objetivos
+```text
+Frontend (React + Vite)  ──HTTP──>  Backend (Express + TypeScript)
+                                        ├─ yt-dlp: análisis y descarga
+                                        └─ FFmpeg: segmentación y miniaturas
+```
 
-  - **Extraer metadatos reales** de cualquier URL (título, thumbnail HD, duración, uploader, subtítulos, calidades disponibles)
-  - **Descargar videos** en la calidad seleccionada con progreso en tiempo real
-  - **Soporte multiplataforma** via yt-dlp + extractores dedicados
-  - **Experiencia fluida** con animaciones, atajos de teclado, notificaciones desktop e historial persistente
+El frontend puede desplegarse como sitio estático. El backend necesita un entorno donde estén instalados `yt-dlp` y FFmpeg.
 
-  ---
+## Requisitos
 
-  ## ✨ Características
+- Node.js 20 o superior
+- pnpm
+- `yt-dlp` para análisis y descargas reales
+- FFmpeg para crear clips y miniaturas
 
-  - 🔍 Análisis con datos reales de yt-dlp (sin placeholders)
-  - 💾 Caché de metadatos (memoria + disco, TTL 10 min)
-  - 📐 7+ calidades detectadas automáticamente (2160p → Audio)
-  - 🎞️ Codec, FPS, bitrate, HDR y dimensiones reales
-  - 📝 Subtítulos e idioma detectados automáticamente
-  - 🖼️ Thumbnail en máxima resolución (maxresdefault)
-  - 🚫 Cancelar descarga en tiempo real (AbortController)
-  - 🔔 Notificaciones desktop al completar
-  - 📜 Historial clickeable agrupado por día
-  - ✅ Validación de URL en tiempo real con detección de plataforma
-  - 🎨 Colores por calidad (4K púrpura, 2K índigo, FHD azul, HD gris, audio verde)
-  - ⌨️ Atajos de teclado (`?` para ver todos)
-  - 📤 Compartir en Twitter/Facebook
-  - 📱 PWA-ready (manifest + icons)
-  - ⚡ Code splitting (6 chunks lazy-loaded)
-  - 🌙 Modo oscuro forzado
+En Windows puedes instalar `yt-dlp` con:
 
-  ---
+```powershell
+winget install yt-dlp.yt-dlp
+```
 
-  ## 🏗️ Arquitectura
+Instala FFmpeg según tu sistema y verifica que ambos comandos estén disponibles en el `PATH`.
 
-  ```
-  Frontend (React + Vite → GitHub Pages)
-  Backend  (Express + TypeScript → Railway/Render/VPS)
-  Dependencias externas: yt-dlp + FFmpeg
-  ```
+## Instalación
 
-  **Flujo de análisis:**
-  1. Cliente envía URL → `POST /api/analyze`
-  2. Backend verifica caché (memoria + disco, TTL 10 min)
-  3. `ExtractorRegistry` selecciona extractor según URL
-  4. Datos extraídos → `parseYtDlpOutput()` → `VideoInfo` normalizado
-  5. Se guarda en caché y se devuelve al cliente
+```powershell
+git clone https://github.com/Naiker12/MediaDock.git
+cd MediaDock
+pnpm install
+```
 
-  **Flujo de descarga:**
-  1. Cliente envía `POST /api/download { url, qualityId }`
-  2. Backend stremea el video directamente al cliente
-  3. Cliente recibe con `axios.onDownloadProgress` y guarda el archivo
+Para desarrollo, abre dos terminales:
 
-  ---
+```powershell
+# Terminal 1
+pnpm frontend:dev
 
-  ## ⚙️ Tecnologías
+# Terminal 2
+pnpm backend:dev
+```
 
-  ### Frontend
-  React 18 · Vite 5 · TypeScript 5 · TailwindCSS 3 · shadcn/ui · Framer Motion 11 · TanStack Query 5 · Zustand 5 · Axios · Zod · Sonner · Lucide React · Radix UI
+La interfaz estará disponible en `http://localhost:5173` y la API en `http://localhost:3001`.
 
-  ### Backend
-  Express 4 · TypeScript 5 · Helmet · CORS · Morgan · express-rate-limit (10 req/min) · Zod · Cheerio
+> En PowerShell, si `pnpm` queda bloqueado por la política de scripts, usa `pnpm.cmd` o abre una terminal nueva después de instalarlo.
 
-  ### Sistema
-  yt-dlp 2026.06 · FFmpeg N-124716 · Node.js 20+ · pnpm · Docker
+## Comandos
 
-  ---
+| Comando | Descripción |
+| --- | --- |
+| `pnpm frontend:dev` | Inicia Vite en el puerto 5173. |
+| `pnpm frontend:build` | Comprueba TypeScript y genera el build del frontend. |
+| `pnpm backend:dev` | Compila e inicia el backend en modo desarrollo. |
+| `pnpm backend:build` | Compila el backend TypeScript. |
+| `pnpm backend:start` | Inicia el backend compilado. |
 
-  ## 🚀 Instalación
+## API
 
-  ```powershell
-  # 1. Instalar yt-dlp + FFmpeg
-  winget install yt-dlp.yt-dlp
+### `POST /api/analyze`
 
-  # 2. Clonar e instalar
-  git clone https://github.com/Naiker12/MediaDock.git
-  cd MediaDock
-  pnpm install
-  cp frontend/.env.example frontend/.env
-  cp backend/.env.example backend/.env
+Obtiene metadatos y formatos disponibles.
 
-  # 3. Iniciar (dos terminales)
-  pnpm frontend:dev   # http://localhost:5173
-  pnpm backend:start  # http://localhost:3001
-  ```
+```json
+{ "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }
+```
 
-  > Abre una **nueva terminal** después de instalar yt-dlp para que el PATH se actualice.
+### `POST /api/download`
 
-  ### Docker
-  ```bash
-  cd backend
-  docker build -t mediadock-backend .
-  docker run -p 3001:3001 mediadock-backend
-  ```
+Descarga el formato seleccionado.
 
-  ---
+```json
+{ "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "qualityId": "22" }
+```
 
-  ## 📡 API
+### `POST /api/clip`
 
-  ### POST /api/analyze
-  ```json
-  // Request
-  { "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }
+Inicia la generación de clips desde una URL. Devuelve un trabajo (`jobId`) que se consulta hasta terminar.
 
-  // Response 200
-  {
-    "cached": false,
-    "info": {
-      "id": "dQw4w9WgXcQ",
-      "title": "Rick Astley - Never Gonna Give You Up (Official Video)",
-      "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
-      "duration": 213,
-      "durationString": "3:33",
-      "uploader": "Rick Astley",
-      "source": "youtube",
-      "language": "en",
-      "subtitles": ["en", "de-DE", "ja", "pt-BR", "es-419"],
-      "qualities": [
-        { "label": "2.16k", "codec": "VP9", "width": 3840, "height": 2160, "fps": 25, "bitrate": 20857000, "filesize": 358612992, "isBest": true },
-        { "label": "1.44k", "codec": "VP9", "width": 2560, "height": 1440 },
-        { "label": "1.08k", "codec": "avc1.640028", "extension": "mp4" },
-        { "label": "720p", "codec": "avc1.4d401f", "extension": "mp4" },
-        { "label": "480p", "codec": "avc1.4d401e", "extension": "mp4" },
-        { "label": "360p", "codec": "avc1.4d401e", "extension": "mp4" },
-        { "label": "Audio", "codec": "mp4a.40.5", "extension": "m4a" }
-      ]
-    }
-  }
-  ```
+```json
+{ "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "clipDuration": 120, "mode": "fast" }
+```
 
-  ### POST /api/info
-  Igual que `/api/analyze` pero devuelve solo `info`.
+### `POST /api/clip/upload`
 
-  ### POST /api/download
-  ```json
-  // Request
-  { "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "qualityId": "4029" }
+Genera clips desde un archivo de video con `multipart/form-data`. Tamaño máximo: 5 GB.
 
-  // Response 200: Binary stream (video/mp4)
-  ```
+### `GET /api/clip/:jobId/status`
 
-  ### GET /health
-  ```json
-  { "status": "ok", "timestamp": "..." }
-  ```
+Devuelve el estado del trabajo y los clips generados hasta ese momento.
 
-  ---
+### `GET /health`
 
-  <div align="center">
-    Hecho con ❤️ por <a href="https://github.com/Naiker12">Naiker12</a>
-  </div>
+```json
+{ "status": "ok", "timestamp": "2026-08-14T00:00:00.000Z" }
+```
+
+## Uso responsable
+
+Descarga solo contenido propio, de dominio público o para el que tengas autorización. Respeta los derechos de autor y las condiciones de cada plataforma.
